@@ -5,6 +5,7 @@ import PromptEditor  from './components/PromptEditor.jsx';
 import JourneyPanel  from './components/JourneyPanel.jsx';
 import SettingsPanel from './components/SettingsPanel.jsx';
 import { extractWords } from './utils/textProcessing.js';
+
 import { hasUserKey }   from './utils/aiSettings.js';
 import { callAIClient } from './utils/aiClient.js';
 import { saveWalk, exportWalk, parseImportedWalk } from './utils/walkStorage.js';
