@@ -109,6 +109,9 @@ export default function SettingsPanel({ isOpen, onClose, onSave, wizardMode = fa
               </div>
               <p className="settings-note">
                 🔒 Stored only in your browser's local storage. Never sent to this server.
+                {settings.provider === 'cloudflare' && (
+                  <> Enter as <code>accountId:apiToken</code>.</>
+                )}
               </p>
               <div className="wizard-nav">
                 <button className="cancel-btn" onClick={() => setStep(1)}>← BACK</button>

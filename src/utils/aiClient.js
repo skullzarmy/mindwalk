@@ -71,11 +71,22 @@ async function callGoogle(apiKey, model, messages, maxTokens) {
   return { choices: [{ message: { role: 'assistant', content: text } }] };
 }
 
+// ── Cloudflare Workers AI ─────────────────────────────────────────────────
+// apiKey format: "accountId:apiToken"
+async function callCloudflare(apiKey, model, messages, maxTokens) {
+  const colonIdx = apiKey.indexOf(':');
+  if (colonIdx < 1) throw new Error('Cloudflare key must be in the format accountId:apiToken');
+  const accountId = apiKey.slice(0, colonIdx);
+  const token     = apiKey.slice(colonIdx + 1);
+  const baseUrl   = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1`;
+  return callOpenAICompatible(baseUrl, token, model, messages, maxTokens);
+}
+
 // ── Public dispatcher ─────────────────────────────────────────────────────
 export async function callAIClient(messages) {
   const { provider, apiKey, model, maxTokens } = getSettings();
   const baseUrl       = PROVIDER_URLS[provider];
-  const resolvedModel = model || { openai: 'gpt-3.5-turbo', anthropic: 'claude-haiku-4-5', google: 'gemini-1.5-flash', xai: 'grok-3-mini', openrouter: 'openai/gpt-3.5-turbo' }[provider] || 'gpt-3.5-turbo';
+  const resolvedModel = model || { openai: 'gpt-3.5-turbo', anthropic: 'claude-haiku-4-5', google: 'gemini-1.5-flash', xai: 'grok-3-mini', openrouter: 'openai/gpt-3.5-turbo', cloudflare: '@cf/meta/llama-3.1-8b-instruct' }[provider] || 'gpt-3.5-turbo';
   const resolvedMax   = maxTokens || 150;
 
   switch (provider) {
@@ -88,6 +99,8 @@ export async function callAIClient(messages) {
         'HTTP-Referer': window.location.origin,
         'X-Title':      'MindWalk',
       });
+    case 'cloudflare':
+      return callCloudflare(apiKey, resolvedModel, messages, resolvedMax);
     default:
       return callOpenAICompatible(baseUrl, apiKey, resolvedModel, messages, resolvedMax);
   }

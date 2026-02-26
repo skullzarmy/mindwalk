@@ -9,7 +9,8 @@ export const SUPPORTED_PROVIDERS = [
   { id: 'anthropic',  label: 'Anthropic Claude', defaultModel: 'claude-haiku-4-5',      keyPlaceholder: 'sk-ant-...' },
   { id: 'google',     label: 'Google Gemini',    defaultModel: 'gemini-1.5-flash',      keyPlaceholder: 'AIza...' },
   { id: 'xai',        label: 'xAI / Grok',       defaultModel: 'grok-3-mini',           keyPlaceholder: 'xai-...' },
-  { id: 'openrouter', label: 'OpenRouter',        defaultModel: 'openai/gpt-3.5-turbo', keyPlaceholder: 'sk-or-...' },
+  { id: 'openrouter',  label: 'OpenRouter',              defaultModel: 'openai/gpt-3.5-turbo',            keyPlaceholder: 'sk-or-...' },
+  { id: 'cloudflare', label: 'Cloudflare Workers AI',   defaultModel: '@cf/meta/llama-3.1-8b-instruct', keyPlaceholder: 'accountId:apiToken' },
 ];
 
 const DEFAULT_SETTINGS = {
