@@ -62,8 +62,9 @@ export default function SettingsPanel({ isOpen, onClose, onSave, wizardMode = fa
           {step === 1 && (
             <div className="wizard-step-body">
               <p className="wizard-intro">
-                No server-side AI key is configured. Add your own key to start exploring — it stays
-                in your browser and is never sent anywhere except directly to the AI provider.
+                An API key from one of the supported providers is required to take a MindWalk.
+                Your key stays in your browser and is used only for direct calls to the AI provider
+                — it is never sent to this server.
               </p>
               <p className="settings-label">STEP 1 — CHOOSE YOUR AI PROVIDER</p>
               <div className="provider-list">
