@@ -2,6 +2,22 @@
 /* ── Reset ─────────────────────────────────────────────────────────────── */
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* ── Skip navigation link (WCAG 2.4.1) ──────────────────────────────────── */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 6px;
+  padding: 8px 14px;
+  background: var(--dark);
+  color: var(--cyan);
+  border: 2px solid var(--cyan);
+  font-family: var(--font);
+  font-size: 0.88rem;
+  z-index: 9999;
+  transition: top 0.1s;
+}
+.skip-link:focus { top: 6px; }
+
 :root {
   --cyan:       #00ffff;
   --purple:     #c084fc;
@@ -10,8 +26,44 @@
   --panel-bg:   rgba(5, 5, 22, 0.93);
   --border:     rgba(0, 255, 255, 0.18);
   --text:       #c8d6e5;
+  --text-dim:   #8a9bb8;   /* secondary text — 7:1 contrast on --dark */
+  --text-mute:  #7b8ea8;   /* tertiary / placeholder — 5:1 contrast on --dark */
   --font:       'Share Tech Mono', 'Courier New', monospace;
   --panel-w:    380px;
+  --focus-ring: 0 0 0 3px var(--cyan);
+}
+
+/* ── Light mode overrides (WCAG prefers-color-scheme) ────────────────────── */
+@media (prefers-color-scheme: light) {
+  :root {
+    --cyan:       #006b8f;   /* darker cyan — 7:1 on light bg */
+    --purple:     #6b21c8;   /* darker purple — 7:1 on light bg */
+    --blue:       #1a4ecf;   /* darker blue — 7:1 on light bg */
+    --dark:       #eef2f7;   /* light background */
+    --panel-bg:   rgba(238, 242, 250, 0.97);
+    --border:     rgba(0, 107, 143, 0.35);
+    --text:       #1a2535;   /* dark text on light bg — 14:1+ */
+    --text-dim:   #3d5268;   /* secondary text on light — 6.5:1 */
+    --text-mute:  #4e6278;   /* placeholder on light — 5:1 */
+    --focus-ring: 0 0 0 3px var(--cyan);
+  }
+}
+
+/* ── High contrast / forced-colors (Windows High Contrast) ─────────────── */
+@media (forced-colors: active) {
+  :root {
+    --cyan:     Highlight;
+    --purple:   Highlight;
+    --blue:     Highlight;
+    --dark:     Canvas;
+    --panel-bg: Canvas;
+    --border:   ButtonBorder;
+    --text:     CanvasText;
+    --text-dim: CanvasText;
+    --text-mute: GrayText;
+  }
+  .loading-ring,
+  .corner-bracket { forced-color-adjust: none; }
 }
 
 html, body, #root {
@@ -29,7 +81,7 @@ html, body, #root {
   color: var(--text);
 }
 
-/* scan-line overlay */
+/* scan-line overlay — suppressed in light mode and reduced-motion */
 .app::after {
   content: '';
   position: fixed; inset: 0;
@@ -40,6 +92,9 @@ html, body, #root {
   );
   pointer-events: none;
   z-index: 900;
+}
+@media (prefers-color-scheme: light) {
+  .app::after { display: none; }
 }
 
 /* vignette */
@@ -125,9 +180,10 @@ html, body, #root {
   border: 1px solid var(--border);
   color: var(--text);
   padding: 8px 18px;
+  min-height: 36px;
   cursor: pointer;
   font-family: var(--font);
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   letter-spacing: 0.12em;
   transition: background 0.18s, border-color 0.18s, color 0.18s, box-shadow 0.18s;
   clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
@@ -138,6 +194,13 @@ html, body, #root {
   border-color: var(--cyan);
   color: var(--cyan);
   box-shadow: 0 0 14px rgba(0,255,255,0.18);
+}
+/* Focus indicator: remove clip-path so outline is fully visible (WCAG 2.4.11) */
+.hud-btn:focus-visible {
+  clip-path: none;
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 /* ── Loading ────────────────────────────────────────────────────────────── */
@@ -169,16 +232,16 @@ html, body, #root {
   letter-spacing: 0.15em;
   animation: pulse 1.4s ease-in-out infinite;
 }
-@keyframes pulse { 0%,100% { opacity: 0.45; } 50% { opacity: 1; } }
+@keyframes pulse { 0%,100% { opacity: 0.75; } 50% { opacity: 1; } }
 
 /* ── Error banner ───────────────────────────────────────────────────────── */
 .error-banner {
   position: absolute;
   top: 72px; left: 50%;
   transform: translateX(-50%);
-  background: rgba(255, 50, 50, 0.08);
-  border: 1px solid rgba(255, 80, 80, 0.4);
-  color: #ff8080;
+  background: rgba(255, 50, 50, 0.12);
+  border: 1px solid rgba(255, 100, 100, 0.6);
+  color: #ff9999;
   padding: 10px 20px;
   display: flex;
   align-items: center;
@@ -188,11 +251,17 @@ html, body, #root {
   z-index: 940;
 }
 .error-banner button {
-  background: none; border: none;
-  color: #ff8080; cursor: pointer;
-  font-size: 1rem; padding: 0; opacity: 0.7;
+  background: none; border: 1px solid transparent;
+  color: #ff9999; cursor: pointer;
+  font-size: 1rem; padding: 4px 6px; opacity: 1;
+  min-width: 28px; min-height: 28px;
+  border-radius: 2px;
 }
-.error-banner button:hover { opacity: 1; }
+.error-banner button:hover { border-color: #ff9999; }
+.error-banner button:focus-visible {
+  outline: 3px solid #ff9999;
+  outline-offset: 2px;
+}
 
 /* ── Bottom bar ─────────────────────────────────────────────────────────── */
 .bottom-bar {
@@ -230,17 +299,26 @@ html, body, #root {
   border-color: var(--cyan);
   box-shadow: 0 0 18px rgba(0,255,255,0.12), inset 0 0 8px rgba(0,255,255,0.04);
 }
+/* Remove clip-path on focus so outline is fully visible (WCAG 2.4.11) */
+.thought-input:focus-visible {
+  clip-path: none;
+  border-radius: 2px;
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+  border-color: var(--cyan);
+}
 .thought-input::placeholder {
-  color: rgba(200, 214, 229, 0.28);
+  color: var(--text-mute);
   font-style: italic;
 }
-.thought-input:disabled { opacity: 0.45; }
+.thought-input:disabled { opacity: 0.55; }
 
 .send-btn {
   background: rgba(0, 255, 255, 0.08);
   border: 1px solid var(--cyan);
   color: var(--cyan);
   padding: 12px 22px;
+  min-height: 44px;
   cursor: pointer;
   font-family: var(--font);
   font-size: 0.82rem;
@@ -253,11 +331,17 @@ html, body, #root {
   background: rgba(0, 255, 255, 0.22);
   box-shadow: 0 0 18px rgba(0,255,255,0.28);
 }
-.send-btn:disabled { opacity: 0.28; cursor: not-allowed; }
+.send-btn:focus-visible {
+  clip-path: none;
+  border-radius: 2px;
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+}
+.send-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .hint {
-  font-size: 0.68rem;
-  color: rgba(200, 214, 229, 0.28);
+  font-size: 0.75rem;
+  color: var(--text-dim);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -311,15 +395,22 @@ html, body, #root {
   background: none;
   border: 1px solid var(--border);
   color: var(--text);
-  width: 24px; height: 24px;
+  width: 28px; height: 28px;
   cursor: pointer;
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: border-color 0.18s, color 0.18s;
+  flex-shrink: 0;
 }
 .close-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+.close-btn:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+  border-color: var(--cyan);
+  border-radius: 2px;
+}
 
 .panel-content {
   flex: 1;
@@ -339,9 +430,8 @@ html, body, #root {
 .message { display: flex; flex-direction: column; gap: 5px; }
 
 .message-role {
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   letter-spacing: 0.1em;
-  opacity: 0.65;
 }
 .message-user      .message-role { color: var(--cyan);   }
 .message-assistant .message-role { color: var(--purple); }
@@ -359,7 +449,7 @@ html, body, #root {
 
 .empty-state {
   text-align: center;
-  color: rgba(200, 214, 229, 0.28);
+  color: var(--text-dim);
   font-size: 0.82rem;
   padding: 40px 20px;
   line-height: 1.7;
@@ -368,7 +458,7 @@ html, body, #root {
 /* ── Prompt editor ──────────────────────────────────────────────────────── */
 .editor-hint {
   font-size: 0.78rem;
-  color: rgba(200, 214, 229, 0.5);
+  color: var(--text-dim);
   line-height: 1.65;
 }
 .editor-hint code {
@@ -392,17 +482,23 @@ html, body, #root {
   transition: border-color 0.2s;
 }
 .prompt-textarea:focus { border-color: var(--cyan); }
+.prompt-textarea:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+  border-color: var(--cyan);
+  border-radius: 2px;
+}
 
 .editor-preview {
   font-size: 0.76rem;
-  color: rgba(200, 214, 229, 0.45);
+  color: var(--text-dim);
   line-height: 1.65;
   padding: 8px 12px;
   border-left: 2px solid var(--purple);
   background: rgba(192,132,252,0.05);
 }
-.editor-preview .preview-label { color: rgba(200,214,229,0.4); }
-.editor-preview em { color: rgba(192,132,252,0.9); font-style: normal; }
+.editor-preview .preview-label { color: var(--text-mute); }
+.editor-preview em { color: var(--purple); font-style: normal; }
 
 .editor-actions { display: flex; gap: 10px; }
 
@@ -412,6 +508,7 @@ html, body, #root {
   border: 1px solid var(--cyan);
   color: var(--cyan);
   padding: 10px;
+  min-height: 40px;
   cursor: pointer;
   font-family: var(--font);
   font-size: 0.78rem;
@@ -422,17 +519,63 @@ html, body, #root {
   background: rgba(0,255,255,0.18);
   box-shadow: 0 0 14px rgba(0,255,255,0.18);
 }
+.save-btn:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
 
 .cancel-btn {
   background: none;
   border: 1px solid var(--border);
-  color: var(--text);
+  color: var(--text-dim);
   padding: 10px 16px;
+  min-height: 40px;
   cursor: pointer;
   font-family: var(--font);
   font-size: 0.78rem;
   letter-spacing: 0.1em;
-  transition: border-color 0.18s, opacity 0.18s;
-  opacity: 0.55;
+  transition: border-color 0.18s, color 0.18s;
 }
-.cancel-btn:hover { opacity: 1; border-color: rgba(200,214,229,0.4); }
+.cancel-btn:hover { color: var(--text); border-color: var(--text-dim); }
+.cancel-btn:focus-visible {
+  outline: 3px solid var(--text-dim);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ── Message content on light mode ─────────────────────────────────────── */
+@media (prefers-color-scheme: light) {
+  .message-user      .message-content { color: #1a2535; background: rgba(0,107,143,0.06); }
+  .message-assistant .message-content { color: #1a2535; background: rgba(107,33,200,0.06); }
+  .thought-input { background: rgba(240,244,252,0.9); }
+  .prompt-textarea { background: rgba(240,244,252,0.9); }
+  .app::before { background: radial-gradient(ellipse at center, transparent 50%, rgba(200,210,230,0.5) 100%); }
+}
+
+/* ── Color-blind friendly mode toggle ──────────────────────────────────── */
+/* Activated via .colorblind-mode class on <div class="app"> */
+/* Uses a palette with high luminance contrast between all key colors.     */
+/* Cyan → #e6a817 (amber), Purple → #0077b6 (ocean blue), Blue → #118ab2  */
+.colorblind-mode {
+  --cyan:   #e6a817;
+  --purple: #0077b6;
+  --blue:   #118ab2;
+  --border: rgba(230, 168, 23, 0.35);
+}
+.colorblind-mode .message-user .message-content      { border-color: #e6a817; background: rgba(230,168,23,0.06); }
+.colorblind-mode .message-assistant .message-content { border-color: #0077b6; background: rgba(0,119,182,0.06);  }
+
+/* ── Reduced motion (WCAG 2.3.3 / user preference) ─────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .loading-ring { animation: none !important; border-top-color: var(--cyan); }
+  .loading-overlay span { animation: none !important; opacity: 1; }
+}

@@ -5,6 +5,7 @@ const DEFAULT_TEMPLATE =
 
 export default function PromptEditor({ template, isOpen, onSave, onClose }) {
   const [value, setValue] = useState(template || DEFAULT_TEMPLATE);
+  const headingId = 'editor-panel-title';
 
   useEffect(() => {
     setValue(template || DEFAULT_TEMPLATE);
@@ -13,10 +14,17 @@ export default function PromptEditor({ template, isOpen, onSave, onClose }) {
   const preview = value.replace('{WORD}', '<word>');
 
   return (
-    <div className={`side-panel editor-panel ${isOpen ? 'open' : ''}`}>
+    <div
+      id="editor-panel"
+      className={`side-panel editor-panel ${isOpen ? 'open' : ''}`}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={headingId}
+      aria-hidden={!isOpen}
+    >
       <div className="panel-header">
-        <span>⚙ PONDER PROMPT</span>
-        <button onClick={onClose} className="close-btn" aria-label="Close editor">✕</button>
+        <span id={headingId}>⚙ PONDER PROMPT</span>
+        <button onClick={onClose} className="close-btn" aria-label="Close prompt editor">✕</button>
       </div>
 
       <div className="panel-content">
@@ -31,9 +39,11 @@ export default function PromptEditor({ template, isOpen, onSave, onClose }) {
           onChange={e => setValue(e.target.value)}
           rows={6}
           spellCheck={false}
+          aria-label="Ponder prompt template"
+          aria-describedby="editor-preview-desc"
         />
 
-        <div className="editor-preview">
+        <div className="editor-preview" id="editor-preview-desc">
           <span className="preview-label">Preview: </span>
           <em>{preview}</em>
         </div>

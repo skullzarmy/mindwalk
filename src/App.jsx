@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import WordCloud3D from './components/WordCloud3D.jsx';
 import ChatPanel    from './components/ChatPanel.jsx';
 import PromptEditor from './components/PromptEditor.jsx';
@@ -39,6 +39,7 @@ export default function App() {
   const [inputValue,      setInputValue]      = useState('');
   const [error,           setError]           = useState(null);
   const [lastWord,        setLastWord]        = useState(null);
+  const [colorblindMode,  setColorblindMode]  = useState(false);
 
   // keep latest messages in a ref so callbacks don't stale-close over them
   const messagesRef = useRef(messages);
@@ -111,12 +112,15 @@ export default function App() {
   };
 
   return (
-    <div className="app">
+    <div className={`app${colorblindMode ? ' colorblind-mode' : ''}`}>
+      {/* Skip navigation link (WCAG 2.4.1) */}
+      <a href="#main-input" className="skip-link">Skip to input</a>
       {/* 3-D canvas fills the whole background */}
       <WordCloud3D
         words={words}
         onWordClick={handleWordClick}
         isLoading={isLoading}
+        colorblindMode={colorblindMode}
       />
 
       {/* Corner HUD brackets */}
@@ -131,10 +135,20 @@ export default function App() {
           <span className="hud-icon" aria-hidden="true">🧠</span>
           <span>MINDWALK</span>
         </div>
-        <nav className="hud-controls">
+        <nav className="hud-controls" aria-label="Application controls">
+          <button
+            className={`hud-btn ${colorblindMode ? 'active' : ''}`}
+            onClick={() => setColorblindMode(v => !v)}
+            aria-pressed={colorblindMode}
+            title="Toggle color-blind friendly mode"
+          >
+            ♿ A11Y
+          </button>
           <button
             className={`hud-btn ${editorOpen ? 'active' : ''}`}
             onClick={toggleEditor}
+            aria-expanded={editorOpen}
+            aria-controls="editor-panel"
             title="Edit ponder prompt"
           >
             ⚙ PROMPT
@@ -142,6 +156,8 @@ export default function App() {
           <button
             className={`hud-btn ${chatOpen ? 'active' : ''}`}
             onClick={toggleChat}
+            aria-expanded={chatOpen}
+            aria-controls="chat-panel"
             title="Toggle conversation log"
           >
             💬 CHAT
@@ -169,7 +185,7 @@ export default function App() {
 
       {/* ── Bottom input bar ── */}
       <footer className="bottom-bar">
-        <form onSubmit={handleSubmit} className="input-form">
+        <form onSubmit={handleSubmit} className="input-form" id="main-input">
           <input
             type="text"
             value={inputValue}
@@ -187,6 +203,7 @@ export default function App() {
             type="submit"
             disabled={isLoading || !inputValue.trim()}
             className="send-btn"
+            aria-label="Submit thought"
           >
             EXPLORE →
           </button>
