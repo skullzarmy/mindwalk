@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 
 export default function ChatPanel({ messages, isOpen, onClose }) {
   const bottomRef = useRef(null);
+  const headingId = 'chat-panel-title';
 
   useEffect(() => {
     if (isOpen) {
@@ -10,10 +11,17 @@ export default function ChatPanel({ messages, isOpen, onClose }) {
   }, [messages, isOpen]);
 
   return (
-    <div className={`side-panel chat-panel ${isOpen ? 'open' : ''}`}>
+    <div
+      id="chat-panel"
+      className={`side-panel chat-panel ${isOpen ? 'open' : ''}`}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={headingId}
+      aria-hidden={!isOpen}
+    >
       <div className="panel-header">
-        <span>💬 CONVERSATION LOG</span>
-        <button onClick={onClose} className="close-btn" aria-label="Close chat">✕</button>
+        <span id={headingId}>💬 CONVERSATION LOG</span>
+        <button onClick={onClose} className="close-btn" aria-label="Close conversation log">✕</button>
       </div>
 
       <div className="panel-content">

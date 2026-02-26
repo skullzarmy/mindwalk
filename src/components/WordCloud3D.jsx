@@ -6,14 +6,24 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function getWordColor(weight) {
+function getWordColor(weight, isLight = false, isColorblind = false) {
+  if (isColorblind) {
+    if (weight > 0.7) return '#e6a817';  // amber – most prominent
+    if (weight > 0.4) return '#0077b6';  // ocean blue – medium
+    return '#118ab2';                     // teal blue – background words
+  }
+  if (isLight) {
+    if (weight > 0.7) return '#006b8f';  // dark cyan on light bg
+    if (weight > 0.4) return '#6b21c8';  // dark purple on light bg
+    return '#1a4ecf';                     // dark blue on light bg
+  }
   if (weight > 0.7) return '#00ffff';   // cyan   – most prominent
   if (weight > 0.4) return '#c084fc';   // purple – medium
   return '#60a5fa';                      // blue   – background words
 }
 
-function createWordSprite(word, weight) {
-  const color = getWordColor(weight);
+function createWordSprite(word, weight, isLight = false, isColorblind = false) {
+  const color = getWordColor(weight, isLight, isColorblind);
   // Use device pixel ratio for crisp text on high-DPI screens
   const dpr    = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
   const canvas = document.createElement('canvas');
@@ -31,22 +41,30 @@ function createWordSprite(word, weight) {
   ctx.textBaseline = 'middle';
   ctx.textAlign    = 'center';
 
-  // glow layers
-  ctx.shadowColor = color;
-  ctx.shadowBlur  = 28 * dpr;
-  ctx.fillStyle   = color;
-  ctx.fillText(word, canvas.width / 2, canvas.height / 2);
+  if (isLight) {
+    // In light mode: draw coloured text with soft shadow (no additive glow)
+    ctx.shadowColor = color;
+    ctx.shadowBlur  = 6 * dpr;
+    ctx.fillStyle   = color;
+    ctx.fillText(word, canvas.width / 2, canvas.height / 2);
+  } else {
+    // In dark mode: glow layers with additive blending
+    ctx.shadowColor = color;
+    ctx.shadowBlur  = 28 * dpr;
+    ctx.fillStyle   = color;
+    ctx.fillText(word, canvas.width / 2, canvas.height / 2);
 
-  ctx.shadowBlur  = 10 * dpr;
-  ctx.fillStyle   = '#ffffff';
-  ctx.fillText(word, canvas.width / 2, canvas.height / 2);
+    ctx.shadowBlur  = 10 * dpr;
+    ctx.fillStyle   = '#ffffff';
+    ctx.fillText(word, canvas.width / 2, canvas.height / 2);
+  }
 
   const texture  = new THREE.CanvasTexture(canvas);
   const material = new THREE.SpriteMaterial({
     map: texture,
     transparent: true,
     depthTest: false,
-    blending: THREE.AdditiveBlending,
+    blending: isLight ? THREE.NormalBlending : THREE.AdditiveBlending,
     opacity: 0,               // fades in on arrival
   });
 
@@ -68,6 +86,10 @@ function createWordSprite(word, weight) {
 }
 
 function createStarField(count = 2500) {
+  if (count === 0) {
+    // Return an empty object for light mode — no stars needed
+    return new THREE.Object3D();
+  }
   const geo  = new THREE.BufferGeometry();
   const pos  = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
@@ -113,7 +135,7 @@ function fibonacciSphere(index, total, radius) {
 // Component
 // ---------------------------------------------------------------------------
 
-export default function WordCloud3D({ words, onWordClick, isLoading }) {
+export default function WordCloud3D({ words, onWordClick, isLoading, colorblindMode = false }) {
   const mountRef   = useRef(null);
   const sceneRef   = useRef(null);
   const cameraRef  = useRef(null);
@@ -125,15 +147,21 @@ export default function WordCloud3D({ words, onWordClick, isLoading }) {
   const raycasterRef = useRef(new THREE.Raycaster());
   const hoveredRef   = useRef(null);
   const tooltipRef   = useRef(null);
+  // Media queries for user preferences
+  const isLightMode    = typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: light)').matches;
+  const reducedMotion  = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // ── Scene bootstrap (runs once) ──────────────────────────────────────────
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return;
 
+    const bgColor = isLightMode ? 0xeef2f7 : 0x050510;
+    const fogColor = isLightMode ? 0xeef2f7 : 0x050510;
+
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x050510);
-    scene.fog = new THREE.FogExp2(0x050510, 0.0012);
+    scene.background = new THREE.Color(bgColor);
+    scene.fog = new THREE.FogExp2(fogColor, 0.0012);
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(
@@ -148,12 +176,12 @@ export default function WordCloud3D({ words, onWordClick, isLoading }) {
     mount.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    scene.add(createStarField());
+    scene.add(createStarField(isLightMode ? 0 : 2500));
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping    = true;
     controls.dampingFactor    = 0.05;
-    controls.autoRotate       = true;
+    controls.autoRotate       = !reducedMotion;
     controls.autoRotateSpeed  = 0.4;
     controls.enablePan        = false;
     controls.minDistance      = 80;
@@ -237,7 +265,7 @@ export default function WordCloud3D({ words, onWordClick, isLoading }) {
 
     const radius = 100;
     const newSprites = words.map((w, i) => {
-      const sprite = createWordSprite(w.word, w.weight);
+      const sprite = createWordSprite(w.word, w.weight, isLightMode, colorblindMode);
       const pos    = fibonacciSphere(i, words.length, radius);
       sprite.position.copy(pos);
       sprite.userData.basePos = pos.clone();
