@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import WordCloud3D from './components/WordCloud3D.jsx';
 import ChatPanel    from './components/ChatPanel.jsx';
 import PromptEditor from './components/PromptEditor.jsx';
@@ -35,9 +35,7 @@ export default function App() {
   const [words,           setWords]           = useState(SEED_WORDS);
   const [promptTemplate,  setPromptTemplate]  = useState(DEFAULT_TEMPLATE);
   const [isLoading,       setIsLoading]       = useState(false);
-  const [chatOpen,        setChatOpen]        = useState(false);
-  const [editorOpen,      setEditorOpen]      = useState(false);
-  const [mapOpen,         setMapOpen]         = useState(false);
+  const [activePanel,     setActivePanel]     = useState(null); // 'chat' | 'editor' | 'map' | null
   const [inputValue,      setInputValue]      = useState('');
   const [error,           setError]           = useState(null);
   const [lastWord,        setLastWord]        = useState(null);
@@ -120,22 +118,11 @@ export default function App() {
     }
   };
 
-  // ── Panel toggles (only one open at a time) ───────────────────────────────
-  const toggleChat = () => {
-    setChatOpen(v => !v);
-    setEditorOpen(false);
-    setMapOpen(false);
-  };
-  const toggleEditor = () => {
-    setEditorOpen(v => !v);
-    setChatOpen(false);
-    setMapOpen(false);
-  };
-  const toggleMap = () => {
-    setMapOpen(v => !v);
-    setChatOpen(false);
-    setEditorOpen(false);
-  };
+  // ── Panel toggle (only one open at a time) ───────────────────────────────
+  /** @param {'chat'|'editor'|'map'} name */
+  const togglePanel = useCallback((name) => {
+    setActivePanel(prev => (prev === name ? null : name));
+  }, []);
 
   return (
     <div className={`app${colorblindMode ? ' colorblind-mode' : ''}`}>
@@ -171,27 +158,27 @@ export default function App() {
             ♿ A11Y
           </button>
           <button
-            className={`hud-btn ${mapOpen ? 'active' : ''}`}
-            onClick={toggleMap}
-            aria-expanded={mapOpen}
+            className={`hud-btn ${activePanel === 'map' ? 'active' : ''}`}
+            onClick={() => togglePanel('map')}
+            aria-expanded={activePanel === 'map'}
             aria-controls="map-panel"
             title="View journey map"
           >
             🗺 MAP
           </button>
           <button
-            className={`hud-btn ${editorOpen ? 'active' : ''}`}
-            onClick={toggleEditor}
-            aria-expanded={editorOpen}
+            className={`hud-btn ${activePanel === 'editor' ? 'active' : ''}`}
+            onClick={() => togglePanel('editor')}
+            aria-expanded={activePanel === 'editor'}
             aria-controls="editor-panel"
             title="Edit ponder prompt"
           >
             ⚙ PROMPT
           </button>
           <button
-            className={`hud-btn ${chatOpen ? 'active' : ''}`}
-            onClick={toggleChat}
-            aria-expanded={chatOpen}
+            className={`hud-btn ${activePanel === 'chat' ? 'active' : ''}`}
+            onClick={() => togglePanel('chat')}
+            aria-expanded={activePanel === 'chat'}
             aria-controls="chat-panel"
             title="Toggle conversation log"
           >
@@ -267,19 +254,19 @@ export default function App() {
       {/* ── Side panels ── */}
       <ChatPanel
         messages={messages}
-        isOpen={chatOpen}
-        onClose={() => setChatOpen(false)}
+        isOpen={activePanel === 'chat'}
+        onClose={() => setActivePanel(null)}
       />
       <PromptEditor
         template={promptTemplate}
-        isOpen={editorOpen}
-        onSave={(t) => { setPromptTemplate(t); setEditorOpen(false); }}
-        onClose={() => setEditorOpen(false)}
+        isOpen={activePanel === 'editor'}
+        onSave={(t) => { setPromptTemplate(t); setActivePanel(null); }}
+        onClose={() => setActivePanel(null)}
       />
       <JourneyPanel
         wordPath={wordPath}
-        isOpen={mapOpen}
-        onClose={() => setMapOpen(false)}
+        isOpen={activePanel === 'map'}
+        onClose={() => setActivePanel(null)}
       />
     </div>
   );
