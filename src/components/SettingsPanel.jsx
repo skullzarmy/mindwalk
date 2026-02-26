@@ -109,8 +109,11 @@ export default function SettingsPanel({ isOpen, onClose, onSave, wizardMode = fa
               </div>
               <p className="settings-note">
                 🔒 Stored only in your browser's local storage. Never sent to this server.
-                {settings.provider === 'cloudflare' && (
+                {settings.provider === 'cloudflare-workers' && (
                   <> Enter as <code>accountId:apiToken</code>.</>
+                )}
+                {settings.provider === 'cloudflare' && (
+                  <> Enter as <code>accountId:gatewayId:apiToken</code>.</>
                 )}
               </p>
               <div className="wizard-nav">

@@ -71,14 +71,28 @@ async function callGoogle(apiKey, model, messages, maxTokens) {
   return { choices: [{ message: { role: 'assistant', content: text } }] };
 }
 
-// ── Cloudflare Workers AI ─────────────────────────────────────────────────
+// ── Cloudflare Workers AI (direct) ───────────────────────────────────────
 // apiKey format: "accountId:apiToken"
-async function callCloudflare(apiKey, model, messages, maxTokens) {
+async function callCloudflareWorkers(apiKey, model, messages, maxTokens) {
   const colonIdx = apiKey.indexOf(':');
-  if (colonIdx < 1) throw new Error('Cloudflare key must be in the format accountId:apiToken');
+  if (colonIdx < 1) throw new Error('Cloudflare Workers AI key must be in the format accountId:apiToken');
   const accountId = apiKey.slice(0, colonIdx);
   const token     = apiKey.slice(colonIdx + 1);
   const baseUrl   = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1`;
+  return callOpenAICompatible(baseUrl, token, model, messages, maxTokens);
+}
+
+// ── Cloudflare AI Gateway ─────────────────────────────────────────────────
+// apiKey format: "accountId:gatewayId:apiToken"
+// Routes through the CF AI Gateway for unified billing, caching & observability.
+// Gateway URL: https://gateway.ai.cloudflare.com/v1/{accountId}/{gatewayId}/workers-ai/v1
+async function callCloudflareGateway(apiKey, model, messages, maxTokens) {
+  const parts = apiKey.split(':');
+  if (parts.length < 3) throw new Error('Cloudflare AI Gateway key must be in the format accountId:gatewayId:apiToken');
+  const accountId = parts[0];
+  const gatewayId = parts[1];
+  const token     = parts.slice(2).join(':'); // token itself may contain colons
+  const baseUrl   = `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/workers-ai/v1`;
   return callOpenAICompatible(baseUrl, token, model, messages, maxTokens);
 }
 
@@ -86,7 +100,7 @@ async function callCloudflare(apiKey, model, messages, maxTokens) {
 export async function callAIClient(messages) {
   const { provider, apiKey, model, maxTokens } = getSettings();
   const baseUrl       = PROVIDER_URLS[provider];
-  const resolvedModel = model || { openai: 'gpt-3.5-turbo', anthropic: 'claude-haiku-4-5', google: 'gemini-1.5-flash', xai: 'grok-3-mini', openrouter: 'openai/gpt-3.5-turbo', cloudflare: '@cf/meta/llama-3.1-8b-instruct' }[provider] || 'gpt-3.5-turbo';
+  const resolvedModel = model || { openai: 'gpt-3.5-turbo', anthropic: 'claude-haiku-4-5', google: 'gemini-1.5-flash', xai: 'grok-3-mini', openrouter: 'openai/gpt-3.5-turbo', 'cloudflare-workers': '@cf/meta/llama-3.1-8b-instruct', cloudflare: '@cf/meta/llama-3.1-8b-instruct' }[provider] || 'gpt-3.5-turbo';
   const resolvedMax   = maxTokens || 150;
 
   switch (provider) {
@@ -99,8 +113,10 @@ export async function callAIClient(messages) {
         'HTTP-Referer': window.location.origin,
         'X-Title':      'MindWalk',
       });
+    case 'cloudflare-workers':
+      return callCloudflareWorkers(apiKey, resolvedModel, messages, resolvedMax);
     case 'cloudflare':
-      return callCloudflare(apiKey, resolvedModel, messages, resolvedMax);
+      return callCloudflareGateway(apiKey, resolvedModel, messages, resolvedMax);
     default:
       return callOpenAICompatible(baseUrl, apiKey, resolvedModel, messages, resolvedMax);
   }
