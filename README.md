@@ -5,9 +5,11 @@ powered by your choice of AI provider.
 
 ## What it does
 
-* The AI's last response is parsed into a **3D spatial word cloud** rendered in
-  real-time with Three.js (Fibonacci-sphere layout, glowing sprites, star-field
-  background, orbital camera).
+* The AI's last **5 responses** are blended into a **3D spatial word cloud**
+  rendered in real-time with Three.js (Fibonacci-sphere layout, glowing
+  sprites, star-field background, orbital camera).  Words that recur across
+  turns are weighted more prominently, creating a rolling *stream-of-thought*
+  that evolves as the session progresses.
 * **Click any word** → triggers a configurable *"ponder"* prompt and regenerates
   the cloud from the next AI response.
 * A **sliding chat panel** (left) shows the full conversation history.
