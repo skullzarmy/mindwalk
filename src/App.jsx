@@ -8,6 +8,9 @@ import './styles/main.css';
 const DEFAULT_TEMPLATE =
   "Ponder the concept of '{WORD}' briefly. Share your key thoughts and connections in 2-3 sentences.";
 
+// Number of past AI responses to blend into the word cloud for a stream-of-thought effect
+const STREAM_DEPTH = 5;
+
 // Initial decorative words shown before the first AI response
 const SEED_WORDS = [
   { word: 'consciousness', weight: 1.0  },
@@ -64,7 +67,16 @@ export default function App() {
       const assistant  = data.choices[0].message;
       const allMessages = [...newMessages, assistant];
       setMessages(allMessages);
-      setWords(extractWords(assistant.content));
+
+      // Build word cloud from the last STREAM_DEPTH AI responses for a
+      // stream-of-thought effect: words persist across turns, with recurring
+      // concepts naturally weighted higher.
+      const recentText = allMessages
+        .filter(m => m.role === 'assistant')
+        .slice(-STREAM_DEPTH)
+        .map(m => m.content)
+        .join(' ');
+      setWords(extractWords(recentText));
     } catch (err) {
       setError(err.message);
     } finally {
