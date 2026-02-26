@@ -1,9 +1,13 @@
-import { useState, useCallback, useRef } from 'react';
-import WordCloud3D from './components/WordCloud3D.jsx';
-import ChatPanel    from './components/ChatPanel.jsx';
-import PromptEditor from './components/PromptEditor.jsx';
-import JourneyPanel from './components/JourneyPanel.jsx';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import WordCloud3D   from './components/WordCloud3D.jsx';
+import ChatPanel     from './components/ChatPanel.jsx';
+import PromptEditor  from './components/PromptEditor.jsx';
+import JourneyPanel  from './components/JourneyPanel.jsx';
+import SettingsPanel from './components/SettingsPanel.jsx';
 import { extractWords } from './utils/textProcessing.js';
+
+import { hasUserKey }   from './utils/aiSettings.js';
+import { callAIClient } from './utils/aiClient.js';
 import { saveWalk, exportWalk, parseImportedWalk } from './utils/walkStorage.js';
 import './styles/main.css';
 
@@ -36,12 +40,14 @@ export default function App() {
   const [words,           setWords]           = useState(SEED_WORDS);
   const [promptTemplate,  setPromptTemplate]  = useState(DEFAULT_TEMPLATE);
   const [isLoading,       setIsLoading]       = useState(false);
-  const [activePanel,     setActivePanel]     = useState(null); // 'chat' | 'editor' | 'map' | null
+  const [activePanel,     setActivePanel]     = useState(null); // 'chat'|'editor'|'map'|'settings'|null
   const [inputValue,      setInputValue]      = useState('');
   const [error,           setError]           = useState(null);
   const [lastWord,        setLastWord]        = useState(null);
   const [colorblindMode,  setColorblindMode]  = useState(false);
   const [wordPath,        setWordPath]        = useState([]);
+  const [byokOnly,        setByokOnly]        = useState(false);
+  const [wizardMode,      setWizardMode]      = useState(false);
 
   // keep latest messages in a ref so callbacks don't stale-close over them
   const messagesRef = useRef(messages);
@@ -49,6 +55,27 @@ export default function App() {
 
   // keep latest wordPath in a ref for the same reason
   const wordPathRef = useRef([]);
+
+  // ── On mount: check if server has a key; enter wizard if BYOK-only ───────
+  useEffect(() => {
+    fetch('/api/config')
+      .then(r => r.json())
+      .then(({ byokOnly: serverByokOnly }) => {
+        setByokOnly(serverByokOnly);
+        if (serverByokOnly && !hasUserKey()) {
+          setWizardMode(true);
+          setActivePanel('settings');
+        }
+      })
+      .catch(() => {
+        // Server unreachable — assume BYOK if user has no key either
+        if (!hasUserKey()) {
+          setByokOnly(true);
+          setWizardMode(true);
+          setActivePanel('settings');
+        }
+      });
+  }, []);
 
   // ── Core API call ─────────────────────────────────────────────────────────
   const sendMessage = useCallback(async (content) => {
@@ -59,18 +86,22 @@ export default function App() {
     setMessages(newMessages);
 
     try {
-      const res  = await fetch('/api/chat', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ messages: newMessages }),
-      });
-      const data = await res.json();
-
-      if (!res.ok || data.error) {
-        throw new Error(data.error || 'API request failed');
+      let data;
+      if (hasUserKey()) {
+        // BYOK: call AI provider directly from browser using the stored key
+        data = await callAIClient(newMessages);
+      } else {
+        // Server-proxy: use the server's configured key
+        const res = await fetch('/api/chat', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ messages: newMessages }),
+        });
+        data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'API request failed');
       }
 
-      const assistant  = data.choices[0].message;
+      const assistant   = data.choices[0].message;
       const allMessages = [...newMessages, assistant];
       setMessages(allMessages);
 
@@ -120,7 +151,7 @@ export default function App() {
   };
 
   // ── Panel toggle (only one open at a time) ───────────────────────────────
-  /** @param {'chat'|'editor'|'map'} name */
+  /** @param {'chat'|'editor'|'map'|'settings'} name */
   const togglePanel = useCallback((name) => {
     setActivePanel(prev => (prev === name ? null : name));
   }, []);
@@ -245,6 +276,15 @@ export default function App() {
           >
             💬 CHAT
           </button>
+          <button
+            className={`hud-btn${activePanel === 'settings' ? ' active' : ''}${byokOnly && !hasUserKey() ? ' hud-btn-alert' : ''}`}
+            onClick={() => { setWizardMode(false); togglePanel('settings'); }}
+            aria-expanded={activePanel === 'settings'}
+            aria-controls="settings-panel"
+            title="AI key &amp; settings"
+          >
+            🔑 KEYS
+          </button>
         </nav>
       </header>
 
@@ -333,6 +373,12 @@ export default function App() {
         onExportWalk={handleExportWalk}
         onImportWalk={handleImportWalk}
         onResumeWalk={handleRestoreWalk}
+      />
+      <SettingsPanel
+        isOpen={activePanel === 'settings'}
+        wizardMode={wizardMode}
+        onClose={() => { setWizardMode(false); setActivePanel(null); }}
+        onSave={() => { setWizardMode(false); setByokOnly(false); setActivePanel(null); }}
       />
     </div>
   );
