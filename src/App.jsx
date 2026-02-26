@@ -2,11 +2,12 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import WordCloud3D from './components/WordCloud3D.jsx';
 import ChatPanel    from './components/ChatPanel.jsx';
 import PromptEditor from './components/PromptEditor.jsx';
+import JourneyPanel from './components/JourneyPanel.jsx';
 import { extractWords } from './utils/textProcessing.js';
 import './styles/main.css';
 
 const DEFAULT_TEMPLATE =
-  "Ponder the concept of '{WORD}' briefly. Share your key thoughts and connections in 2-3 sentences.";
+  "We are on a mind walk, building a path of connected concepts. Journey so far: {PATH}. Now ponder '{WORD}' — share your key thoughts and connections in 2-3 sentences, weaving in how this concept relates to or diverges from the path.";
 
 // Number of past AI responses to blend into the word cloud for a stream-of-thought effect
 const STREAM_DEPTH = 5;
@@ -36,14 +37,19 @@ export default function App() {
   const [isLoading,       setIsLoading]       = useState(false);
   const [chatOpen,        setChatOpen]        = useState(false);
   const [editorOpen,      setEditorOpen]      = useState(false);
+  const [mapOpen,         setMapOpen]         = useState(false);
   const [inputValue,      setInputValue]      = useState('');
   const [error,           setError]           = useState(null);
   const [lastWord,        setLastWord]        = useState(null);
   const [colorblindMode,  setColorblindMode]  = useState(false);
+  const [wordPath,        setWordPath]        = useState([]);
 
   // keep latest messages in a ref so callbacks don't stale-close over them
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
+
+  // keep latest wordPath in a ref for the same reason
+  const wordPathRef = useRef([]);
 
   // ── Core API call ─────────────────────────────────────────────────────────
   const sendMessage = useCallback(async (content) => {
@@ -87,7 +93,20 @@ export default function App() {
 
   // ── Word-click handler ────────────────────────────────────────────────────
   const handleWordClick = useCallback((word) => {
-    const prompt = promptTemplate.replace('{WORD}', word);
+    const newPath = [...wordPathRef.current, word];
+    wordPathRef.current = newPath;
+    setWordPath(newPath);
+
+    const pathStr = newPath.join(' → ');
+    let prompt = promptTemplate.replace('{WORD}', word);
+
+    if (prompt.includes('{PATH}')) {
+      prompt = prompt.replace('{PATH}', pathStr);
+    } else if (newPath.length > 1) {
+      // Append path context so the AI can weave connections across the journey
+      prompt += `\n\n[Mind walk journey: ${pathStr}]`;
+    }
+
     setLastWord(word);
     sendMessage(prompt);
   }, [promptTemplate, sendMessage]);
@@ -105,10 +124,17 @@ export default function App() {
   const toggleChat = () => {
     setChatOpen(v => !v);
     setEditorOpen(false);
+    setMapOpen(false);
   };
   const toggleEditor = () => {
     setEditorOpen(v => !v);
     setChatOpen(false);
+    setMapOpen(false);
+  };
+  const toggleMap = () => {
+    setMapOpen(v => !v);
+    setChatOpen(false);
+    setEditorOpen(false);
   };
 
   return (
@@ -145,6 +171,15 @@ export default function App() {
             ♿ A11Y
           </button>
           <button
+            className={`hud-btn ${mapOpen ? 'active' : ''}`}
+            onClick={toggleMap}
+            aria-expanded={mapOpen}
+            aria-controls="map-panel"
+            title="View journey map"
+          >
+            🗺 MAP
+          </button>
+          <button
             className={`hud-btn ${editorOpen ? 'active' : ''}`}
             onClick={toggleEditor}
             aria-expanded={editorOpen}
@@ -164,6 +199,20 @@ export default function App() {
           </button>
         </nav>
       </header>
+
+      {/* ── Path trail ── */}
+      {wordPath.length > 0 && (
+        <div className="path-trail" aria-label="Mind walk journey path">
+          {wordPath.map((word, i) => (
+            <span key={i} className="path-trail-item">
+              {i > 0 && <span className="path-trail-arrow" aria-hidden="true">→</span>}
+              <span className={`path-trail-node${i === wordPath.length - 1 ? ' path-trail-node-current' : ''}`}>
+                {word}
+              </span>
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* ── Loading indicator ── */}
       {isLoading && (
@@ -226,6 +275,11 @@ export default function App() {
         isOpen={editorOpen}
         onSave={(t) => { setPromptTemplate(t); setEditorOpen(false); }}
         onClose={() => setEditorOpen(false)}
+      />
+      <JourneyPanel
+        wordPath={wordPath}
+        isOpen={mapOpen}
+        onClose={() => setMapOpen(false)}
       />
     </div>
   );

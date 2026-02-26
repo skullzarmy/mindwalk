@@ -566,7 +566,130 @@ html, body, #root {
 .colorblind-mode .message-user .message-content      { border-color: #e6a817; background: rgba(230,168,23,0.06); }
 .colorblind-mode .message-assistant .message-content { border-color: #0077b6; background: rgba(0,119,182,0.06);  }
 
-/* ── Reduced motion (WCAG 2.3.3 / user preference) ─────────────────────── */
+/* ── Path trail ─────────────────────────────────────────────────────────── */
+.path-trail {
+  position: absolute;
+  top: 66px;
+  left: 0; right: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: nowrap;
+  padding: 5px 26px;
+  overflow-x: auto;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 912;
+  scrollbar-width: none;
+}
+.path-trail::-webkit-scrollbar { display: none; }
+
+.path-trail-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.path-trail-arrow {
+  color: var(--text-mute);
+  font-size: 0.65rem;
+}
+
+.path-trail-node {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  text-transform: lowercase;
+}
+
+.path-trail-node-current {
+  color: var(--cyan);
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.45);
+  font-weight: bold;
+}
+
+@media (prefers-color-scheme: light) {
+  .path-trail-node-current {
+    text-shadow: 0 0 6px rgba(0, 107, 143, 0.35);
+  }
+}
+
+/* ── Journey Map panel ──────────────────────────────────────────────────── */
+/* Map slides from the RIGHT (same side as editor; only one open at a time) */
+.map-panel {
+  right: 0;
+  transform: translateX(100%);
+  border-right: none;
+  clip-path: polygon(14px 0, 100% 0, 100% 100%, 0 100%, 0 14px);
+}
+.map-panel.open { transform: translateX(0); }
+
+.journey-nodes {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 8px 0;
+}
+
+.journey-node {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.journey-node-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  gap: 0;
+}
+
+.node-step {
+  font-size: 0.62rem;
+  color: var(--text-mute);
+  letter-spacing: 0.08em;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.node-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  border: 1px solid var(--text-dim);
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.node-dot-current {
+  border-color: var(--cyan);
+  background: var(--cyan);
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
+}
+
+.node-line {
+  width: 1px;
+  flex: 1;
+  min-height: 28px;
+  background: var(--border);
+  margin: 3px 0;
+}
+
+.node-label {
+  font-size: 0.88rem;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  padding: 2px 0 28px 0;
+  line-height: 1.2;
+}
+
+.node-label-current {
+  color: var(--cyan);
+  text-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
+  font-weight: bold;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
