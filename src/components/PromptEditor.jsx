@@ -11,7 +11,7 @@ export default function PromptEditor({ template, isOpen, onSave, onClose }) {
     setValue(template || DEFAULT_TEMPLATE);
   }, [template]);
 
-  const preview = value.replace('{WORD}', '<word>');
+  const preview = value.replace('{WORD}', '<word>').replace('{PATH}', '<path>');
 
   return (
     <div
@@ -30,7 +30,8 @@ export default function PromptEditor({ template, isOpen, onSave, onClose }) {
       <div className="panel-content">
         <p className="editor-hint">
           Use <code>{'{WORD}'}</code> as a placeholder — it is replaced with
-          the word you click in the cloud.
+          the word you click in the cloud. Use <code>{'{PATH}'}</code> to include
+          the full journey path of selected words.
         </p>
 
         <textarea
