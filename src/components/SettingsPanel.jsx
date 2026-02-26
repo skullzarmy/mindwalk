@@ -1,14 +1,27 @@
 import { useState, useEffect } from 'react';
 import { getSettings, saveSettings, clearSettings, SUPPORTED_PROVIDERS } from '../utils/aiSettings.js';
 
-export default function SettingsPanel({ isOpen, onClose, onSave, wizardMode = false }) {
-  const [settings, setSettings] = useState(getSettings);
-  const [step,     setStep]     = useState(wizardMode ? 1 : 0); // 0 = full panel, 1-3 = wizard
-  const [showKey,  setShowKey]  = useState(false);
+export default function SettingsPanel({
+  isOpen,
+  onClose,
+  onSave,
+  wizardMode = false,
+  colorblindMode = false,
+  onColorblindModeChange,
+  promptTemplate = '',
+  onPromptSave,
+}) {
+  const [settings,      setSettings]      = useState(getSettings);
+  const [step,          setStep]          = useState(wizardMode ? 1 : 0); // 0 = full panel, 1-3 = wizard
+  const [showKey,       setShowKey]       = useState(false);
+  const [promptValue,   setPromptValue]   = useState(promptTemplate);
   const headingId = 'settings-panel-title';
 
   // Re-read settings each time panel opens
   useEffect(() => { if (isOpen) setSettings(getSettings()); }, [isOpen]);
+
+  // Sync prompt value when template prop changes or panel opens
+  useEffect(() => { if (isOpen) setPromptValue(promptTemplate); }, [isOpen, promptTemplate]);
 
   // Enter/exit wizard mode when prop changes
   useEffect(() => { setStep(wizardMode ? 1 : 0); }, [wizardMode]);
@@ -135,7 +148,7 @@ export default function SettingsPanel({ isOpen, onClose, onSave, wizardMode = fa
               <p className="settings-label">STEP 3 — READY TO EXPLORE</p>
               <p className="wizard-intro">
                 Using <strong>{selectedProvider.label}</strong> with your personal key.
-                You can change provider, model, or token settings anytime via the <strong>🔑 KEYS</strong> button.
+                You can change provider, model, or token settings anytime via the <strong>⚙ SETTINGS</strong> button.
               </p>
               <p className="settings-note">
                 🔒 Your key is stored locally and all AI calls go directly from your browser to {selectedProvider.label}.
@@ -167,6 +180,46 @@ export default function SettingsPanel({ isOpen, onClose, onSave, wizardMode = fa
       </div>
 
       <div className="panel-content">
+
+        <div className="settings-section">
+          <span className="settings-label">DISPLAY</span>
+          <label className="settings-toggle-row">
+            <input
+              type="checkbox"
+              checked={colorblindMode}
+              onChange={e => onColorblindModeChange?.(e.target.checked)}
+              aria-label="Toggle color-blind friendly mode"
+            />
+            <span>Color-blind friendly mode</span>
+          </label>
+        </div>
+
+        <div className="settings-section">
+          <label htmlFor="settings-prompt" className="settings-label">PONDER PROMPT</label>
+          <p className="editor-hint">
+            Use <code>{'{WORD}'}</code> for the clicked word and <code>{'{PATH}'}</code> for the full journey path.
+          </p>
+          <textarea
+            id="settings-prompt"
+            className="prompt-textarea"
+            value={promptValue}
+            onChange={e => setPromptValue(e.target.value)}
+            rows={5}
+            spellCheck={false}
+            aria-label="Ponder prompt template"
+          />
+          <div className="editor-preview">
+            <span className="preview-label">Preview: </span>
+            <em>{promptValue.replace('{WORD}', '<word>').replace('{PATH}', '<path>')}</em>
+          </div>
+          <button
+            className="save-btn"
+            style={{ marginTop: '8px' }}
+            onClick={() => onPromptSave?.(promptValue)}
+          >
+            SAVE TEMPLATE
+          </button>
+        </div>
 
         <div className="settings-section">
           <label htmlFor="settings-provider" className="settings-label">AI PROVIDER</label>

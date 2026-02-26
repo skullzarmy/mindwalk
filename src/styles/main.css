@@ -791,6 +791,22 @@ html, body, #root {
   gap: 6px;
 }
 
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-main);
+}
+
+.settings-toggle-row input[type="checkbox"] {
+  accent-color: var(--cyan);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
 .settings-label {
   font-size: 0.72rem;
   letter-spacing: 0.14em;
