@@ -185,6 +185,15 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, 'dist')));
 }
 
+// Tells the client whether a server-side AI key is available so it knows
+// whether to enter BYOK-only mode or can fall back to the server proxy.
+app.get('/api/config', (_req, res) => {
+  const provider = selectProvider();
+  const cfg      = PROVIDER_DEFAULTS[provider];
+  const hasKey   = !isPlaceholder(process.env[cfg.keyVar]);
+  res.json({ byokOnly: !hasKey, serverProvider: hasKey ? provider : null });
+});
+
 app.post('/api/chat', chatLimiter, async (req, res) => {
   const { messages } = req.body;
 

@@ -708,3 +708,271 @@ html, body, #root {
   .loading-ring { animation: none !important; border-top-color: var(--cyan); }
   .loading-overlay span { animation: none !important; opacity: 1; }
 }
+
+/* ── Settings panel & BYOK wizard ───────────────────────────────────────── */
+
+/* Alert badge on KEYS button when no key is set and server has none either */
+.hud-btn-alert {
+  border-color: var(--purple);
+  color: var(--purple);
+  animation: pulse-alert 1.8s ease-in-out infinite;
+}
+@keyframes pulse-alert {
+  0%, 100% { box-shadow: none; }
+  50%       { box-shadow: 0 0 14px rgba(192, 132, 252, 0.55); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hud-btn-alert { animation: none; }
+}
+
+/* Wizard step indicator row */
+.wizard-steps {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  padding: 18px 20px 6px;
+  flex-shrink: 0;
+}
+
+.wizard-step-dot {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  color: var(--text-mute);
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.wizard-step-dot.active {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+.wizard-step-dot.done {
+  border-color: var(--purple);
+  color: var(--purple);
+  background: rgba(192, 132, 252, 0.12);
+}
+
+/* Wizard step content */
+.wizard-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wizard-intro {
+  font-size: 0.82rem;
+  line-height: 1.7;
+  color: var(--text-dim);
+  padding: 10px 14px;
+  border-left: 2px solid var(--purple);
+  background: rgba(192, 132, 252, 0.05);
+}
+
+.wizard-next-btn {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.wizard-nav {
+  display: flex;
+  gap: 10px;
+}
+.wizard-nav .save-btn  { flex: 1; }
+.wizard-nav .cancel-btn { flex: 0 0 auto; }
+
+/* Settings sections */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  color: var(--text-mute);
+  text-transform: uppercase;
+}
+
+.settings-optional {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: var(--text-mute);
+  text-transform: none;
+  opacity: 0.75;
+}
+
+.settings-select {
+  width: 100%;
+  background: rgba(0, 0, 20, 0.58);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px 12px;
+  font-family: var(--font);
+  font-size: 0.82rem;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  appearance: auto;
+}
+.settings-select:focus { border-color: var(--cyan); }
+.settings-select:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+@media (prefers-color-scheme: light) {
+  .settings-select { background: rgba(240, 244, 252, 0.9); }
+}
+
+/* Key input row: input + toggle-visibility button side by side */
+.key-input-row {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.settings-input {
+  flex: 1;
+  background: rgba(0, 0, 20, 0.58);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px 12px;
+  font-family: var(--font);
+  font-size: 0.82rem;
+  outline: none;
+  transition: border-color 0.2s;
+  min-width: 0;
+}
+.settings-input:focus { border-color: var(--cyan); }
+.settings-input:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.settings-input::placeholder { color: var(--text-mute); font-style: italic; }
+@media (prefers-color-scheme: light) {
+  .settings-input { background: rgba(240, 244, 252, 0.9); }
+}
+
+.toggle-key-btn {
+  background: rgba(0, 0, 20, 0.58);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 0 10px;
+  min-width: 38px;
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.18s, color 0.18s;
+  flex-shrink: 0;
+}
+.toggle-key-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+.toggle-key-btn:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+@media (prefers-color-scheme: light) {
+  .toggle-key-btn { background: rgba(240, 244, 252, 0.9); }
+}
+
+.settings-note {
+  font-size: 0.73rem;
+  color: var(--text-mute);
+  line-height: 1.55;
+}
+
+/* Token slider */
+.settings-slider {
+  width: 100%;
+  accent-color: var(--cyan);
+  cursor: pointer;
+}
+.settings-slider:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: var(--text-mute);
+  letter-spacing: 0.08em;
+}
+
+/* Destructive "clear key" button */
+.settings-clear-btn {
+  width: 100%;
+  background: none;
+  border: 1px solid rgba(255, 80, 80, 0.4);
+  color: rgba(255, 120, 120, 0.85);
+  padding: 8px;
+  min-height: 38px;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  transition: border-color 0.18s, color 0.18s, background 0.18s;
+}
+.settings-clear-btn:hover {
+  background: rgba(255, 80, 80, 0.08);
+  border-color: rgba(255, 80, 80, 0.7);
+  color: rgba(255, 140, 140, 1);
+}
+.settings-clear-btn:focus-visible {
+  outline: 3px solid rgba(255, 80, 80, 0.6);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Provider selection buttons in wizard */
+.provider-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.provider-btn {
+  background: rgba(0, 0, 20, 0.4);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 10px 14px;
+  min-height: 40px;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  transition: border-color 0.18s, color 0.18s, background 0.18s;
+}
+.provider-btn:hover {
+  border-color: var(--cyan);
+  color: var(--text);
+  background: rgba(0, 255, 255, 0.06);
+}
+.provider-btn.selected {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: rgba(0, 255, 255, 0.09);
+}
+.provider-btn:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+@media (prefers-color-scheme: light) {
+  .provider-btn          { background: rgba(240, 244, 252, 0.7); }
+  .provider-btn.selected { background: rgba(0, 107, 143, 0.08); }
+  .settings-input,
+  .settings-select       { background: rgba(240, 244, 252, 0.9); }
+  .toggle-key-btn        { background: rgba(240, 244, 252, 0.9); }
+}
