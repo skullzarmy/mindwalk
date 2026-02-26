@@ -4,6 +4,7 @@ import ChatPanel    from './components/ChatPanel.jsx';
 import PromptEditor from './components/PromptEditor.jsx';
 import JourneyPanel from './components/JourneyPanel.jsx';
 import { extractWords } from './utils/textProcessing.js';
+import { saveWalk, exportWalk, parseImportedWalk } from './utils/walkStorage.js';
 import './styles/main.css';
 
 const DEFAULT_TEMPLATE =
@@ -123,6 +124,66 @@ export default function App() {
   const togglePanel = useCallback((name) => {
     setActivePanel(prev => (prev === name ? null : name));
   }, []);
+
+  // ── Walk management ───────────────────────────────────────────────────────
+
+  /** Reset to a fresh walk */
+  const handleNewWalk = useCallback(() => {
+    setMessages([]);
+    setWords(SEED_WORDS);
+    wordPathRef.current = [];
+    setWordPath([]);
+    setLastWord(null);
+    setError(null);
+  }, []);
+
+  /** Persist the current path to localStorage */
+  const handleSaveWalk = useCallback(() => {
+    if (wordPathRef.current.length > 0) {
+      saveWalk(wordPathRef.current);
+    }
+  }, []);
+
+  /** Download the current path as a JSON file */
+  const handleExportWalk = useCallback(() => {
+    if (wordPathRef.current.length > 0) {
+      exportWalk(wordPathRef.current);
+    }
+  }, []);
+
+  /**
+   * Restore a path (from import or resume) then send a fresh AI prompt for
+   * the last word so the walk can continue seamlessly.
+   */
+  const handleRestoreWalk = useCallback((path) => {
+    if (!Array.isArray(path) || path.length === 0) return;
+    // Pre-populate the ref with all words except the last
+    const priorPath = path.slice(0, -1);
+    const resumeWord = path[path.length - 1];
+    setMessages([]);
+    setWords(SEED_WORDS);
+    setError(null);
+    wordPathRef.current = priorPath;
+    setWordPath(priorPath);
+    // handleWordClick will append resumeWord, build the prompt, and call the API
+    handleWordClick(resumeWord);
+  }, [handleWordClick]);
+
+  /** Parse a File object and restore the walk */
+  const handleImportWalk = useCallback((file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const path = parseImportedWalk(e.target.result);
+        handleRestoreWalk(path);
+      } catch (err) {
+        setError(`Import failed: ${err.message}`);
+      }
+    };
+    reader.onerror = () => setError('Could not read the selected file');
+    reader.readAsText(file);
+  }, [handleRestoreWalk]);
 
   return (
     <div className={`app${colorblindMode ? ' colorblind-mode' : ''}`}>
@@ -267,6 +328,11 @@ export default function App() {
         wordPath={wordPath}
         isOpen={activePanel === 'map'}
         onClose={() => setActivePanel(null)}
+        onNewWalk={handleNewWalk}
+        onSaveWalk={handleSaveWalk}
+        onExportWalk={handleExportWalk}
+        onImportWalk={handleImportWalk}
+        onResumeWalk={handleRestoreWalk}
       />
     </div>
   );
