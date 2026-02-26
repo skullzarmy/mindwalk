@@ -1,0 +1,273 @@
+import { useEffect, useRef, useCallback } from 'react';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function getWordColor(weight) {
+  if (weight > 0.7) return '#00ffff';   // cyan   – most prominent
+  if (weight > 0.4) return '#c084fc';   // purple – medium
+  return '#60a5fa';                      // blue   – background words
+}
+
+function createWordSprite(word, weight) {
+  const color = getWordColor(weight);
+  // Use device pixel ratio for crisp text on high-DPI screens
+  const dpr    = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+  const canvas = document.createElement('canvas');
+  const ctx    = canvas.getContext('2d');
+
+  const fontSize = Math.round((28 + weight * 36) * dpr); // 28 – 64 px logical
+  ctx.font = `bold ${fontSize}px "Share Tech Mono","Courier New",monospace`;
+  const textWidth = ctx.measureText(word).width;
+  const pad = Math.round(22 * dpr);
+  canvas.width  = Math.ceil(textWidth + pad * 2);
+  canvas.height = Math.ceil(fontSize * 1.4 + pad * 2);
+
+  // re-apply font after canvas resize (resize resets context)
+  ctx.font = `bold ${fontSize}px "Share Tech Mono","Courier New",monospace`;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign    = 'center';
+
+  // glow layers
+  ctx.shadowColor = color;
+  ctx.shadowBlur  = 28 * dpr;
+  ctx.fillStyle   = color;
+  ctx.fillText(word, canvas.width / 2, canvas.height / 2);
+
+  ctx.shadowBlur  = 10 * dpr;
+  ctx.fillStyle   = '#ffffff';
+  ctx.fillText(word, canvas.width / 2, canvas.height / 2);
+
+  const texture  = new THREE.CanvasTexture(canvas);
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+    blending: THREE.AdditiveBlending,
+    opacity: 0,               // fades in on arrival
+  });
+
+  // Divide by (dpr * 22) so physical canvas pixels → consistent Three.js units
+  const scaleX = canvas.width  / (dpr * 22);
+  const scaleY = canvas.height / (dpr * 22);
+  const sprite  = new THREE.Sprite(material);
+  sprite.scale.set(scaleX, scaleY, 1);
+
+  sprite.userData = {
+    word,
+    weight,
+    baseScale: new THREE.Vector3(scaleX, scaleY, 1),
+    baseY: 0,
+    phase:      Math.random() * Math.PI * 2,
+    floatSpeed: 0.3 + Math.random() * 0.35,
+  };
+
+  return sprite;
+}
+
+function createStarField(count = 2500) {
+  const geo  = new THREE.BufferGeometry();
+  const pos  = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    pos[i * 3]     = (Math.random() - 0.5) * 2400;
+    pos[i * 3 + 1] = (Math.random() - 0.5) * 2400;
+    pos[i * 3 + 2] = (Math.random() - 0.5) * 2400;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  return new THREE.Points(
+    geo,
+    new THREE.PointsMaterial({
+      color: 0xaaaaff,
+      size: 1.4,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0.75,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+  );
+}
+
+/**
+ * Fibonacci-sphere distribution for uniform point coverage.
+ */
+function fibonacciSphere(index, total, radius) {
+  const goldenRatio = (1 + Math.sqrt(5)) / 2;
+  const theta = (2 * Math.PI * index) / goldenRatio;
+  const phi   = Math.acos(1 - (2 * (index + 0.5)) / total);
+  return new THREE.Vector3(
+    radius * Math.sin(phi) * Math.cos(theta),
+    radius * Math.sin(phi) * Math.sin(theta),
+    radius * Math.cos(phi),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export default function WordCloud3D({ words, onWordClick, isLoading }) {
+  const mountRef   = useRef(null);
+  const sceneRef   = useRef(null);
+  const cameraRef  = useRef(null);
+  const rendererRef= useRef(null);
+  const controlsRef= useRef(null);
+  const spritesRef = useRef([]);
+  const rafRef     = useRef(null);
+  const clockRef   = useRef(new THREE.Clock());
+  const raycasterRef = useRef(new THREE.Raycaster());
+  const hoveredRef   = useRef(null);
+
+  // ── Scene bootstrap (runs once) ──────────────────────────────────────────
+  useEffect(() => {
+    const mount = mountRef.current;
+    if (!mount) return;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x050510);
+    scene.fog = new THREE.FogExp2(0x050510, 0.0012);
+    sceneRef.current = scene;
+
+    const camera = new THREE.PerspectiveCamera(
+      60, mount.clientWidth / mount.clientHeight, 0.1, 3000
+    );
+    camera.position.set(0, 0, 220);
+    cameraRef.current = camera;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setSize(mount.clientWidth, mount.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    mount.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
+
+    scene.add(createStarField());
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping    = true;
+    controls.dampingFactor    = 0.05;
+    controls.autoRotate       = true;
+    controls.autoRotateSpeed  = 0.4;
+    controls.enablePan        = false;
+    controls.minDistance      = 80;
+    controls.maxDistance      = 500;
+    controlsRef.current = controls;
+
+    const clock = clockRef.current;
+
+    function animate() {
+      rafRef.current = requestAnimationFrame(animate);
+      const t = clock.getElapsedTime();
+
+      spritesRef.current.forEach(sprite => {
+        const { phase, floatSpeed, baseScale, baseY } = sprite.userData;
+
+        // fade in
+        if (sprite.material.opacity < 1) {
+          sprite.material.opacity = Math.min(1, sprite.material.opacity + 0.025);
+        }
+
+        // float
+        sprite.position.y = baseY + Math.sin(t * floatSpeed + phase) * 2.2;
+
+        // hover scale
+        const target = sprite === hoveredRef.current
+          ? new THREE.Vector3(baseScale.x * 1.45, baseScale.y * 1.45, 1)
+          : baseScale;
+        sprite.scale.lerp(target, 0.12);
+      });
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    function onResize() {
+      if (!mount) return;
+      camera.aspect = mount.clientWidth / mount.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(mount.clientWidth, mount.clientHeight);
+    }
+    window.addEventListener('resize', onResize);
+
+    return () => {
+      window.removeEventListener('resize', onResize);
+      cancelAnimationFrame(rafRef.current);
+      renderer.dispose();
+      if (mount.contains(renderer.domElement)) {
+        mount.removeChild(renderer.domElement);
+      }
+    };
+  }, []);
+
+  // ── Rebuild word cloud whenever words change ──────────────────────────────
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+
+    // dispose old sprites
+    spritesRef.current.forEach(s => {
+      scene.remove(s);
+      s.material.map?.dispose();
+      s.material.dispose();
+    });
+    hoveredRef.current = null;
+    spritesRef.current = [];
+
+    if (!words?.length) return;
+
+    const radius = 100;
+    const newSprites = words.map((w, i) => {
+      const sprite = createWordSprite(w.word, w.weight);
+      const pos    = fibonacciSphere(i, words.length, radius);
+      sprite.position.copy(pos);
+      sprite.userData.baseY = pos.y;
+      scene.add(sprite);
+      return sprite;
+    });
+    spritesRef.current = newSprites;
+  }, [words]);
+
+  // ── Mouse interaction ─────────────────────────────────────────────────────
+  const getIntersects = useCallback((clientX, clientY) => {
+    const mount = mountRef.current;
+    const cam   = cameraRef.current;
+    if (!mount || !cam) return [];
+    const rect = mount.getBoundingClientRect();
+    const x =  ((clientX - rect.left)  / rect.width)  * 2 - 1;
+    const y = -((clientY - rect.top)   / rect.height)  * 2 + 1;
+    const rc = raycasterRef.current;
+    rc.setFromCamera(new THREE.Vector2(x, y), cam);
+    return rc.intersectObjects(spritesRef.current);
+  }, []);
+
+  const handleMouseMove = useCallback((e) => {
+    const hits = getIntersects(e.clientX, e.clientY);
+    if (hits.length > 0) {
+      hoveredRef.current = hits[0].object;
+      mountRef.current.style.cursor = isLoading ? 'wait' : 'pointer';
+    } else {
+      hoveredRef.current = null;
+      mountRef.current.style.cursor = 'default';
+    }
+  }, [getIntersects, isLoading]);
+
+  const handleClick = useCallback((e) => {
+    if (isLoading) return;
+    const hits = getIntersects(e.clientX, e.clientY);
+    if (hits.length > 0) {
+      onWordClick(hits[0].object.userData.word);
+    }
+  }, [isLoading, onWordClick, getIntersects]);
+
+  return (
+    <div
+      ref={mountRef}
+      className="word-cloud-canvas"
+      onMouseMove={handleMouseMove}
+      onClick={handleClick}
+    />
+  );
+}
