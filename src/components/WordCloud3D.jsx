@@ -175,25 +175,24 @@ export default function WordCloud3D({ words, onWordClick, isLoading }) {
           sprite.material.opacity = Math.min(1, sprite.material.opacity + 0.025);
         }
 
-        const floatY = Math.sin(t * floatSpeed + phase) * 2.2;
+        const floatY = Math.sin(t * floatSpeed + phase) * 1.5;
 
         if (sprite === hoveredRef.current && cam) {
-          // float toward camera: move 80 units along the camera direction
-          _toCamera.subVectors(cam.position, basePos).normalize().multiplyScalar(80);
+          // gently float toward camera: 35 units along the view direction
+          _toCamera.subVectors(cam.position, basePos).normalize().multiplyScalar(35);
           _hoverTarget.set(
             basePos.x + _toCamera.x,
             basePos.y + _toCamera.y + floatY,
             basePos.z + _toCamera.z,
           );
-          sprite.position.lerp(_hoverTarget, 0.1);
-          _hoverScale.set(baseScale.x * 2.5, baseScale.y * 2.5, 1);
-          sprite.scale.lerp(_hoverScale, 0.12);
+          sprite.position.lerp(_hoverTarget, 0.06);
+          _hoverScale.set(baseScale.x * 1.5, baseScale.y * 1.5, 1);
+          sprite.scale.lerp(_hoverScale, 0.07);
         } else {
-          // return to base position with float
-          sprite.position.y = basePos.y + floatY;
-          sprite.position.x += (basePos.x - sprite.position.x) * 0.1;
-          sprite.position.z += (basePos.z - sprite.position.z) * 0.1;
-          sprite.scale.lerp(baseScale, 0.12);
+          // smoothly return to base position — lerp all three axes equally
+          _hoverTarget.set(basePos.x, basePos.y + floatY, basePos.z);
+          sprite.position.lerp(_hoverTarget, 0.06);
+          sprite.scale.lerp(baseScale, 0.07);
         }
       });
 
