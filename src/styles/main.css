@@ -825,6 +825,50 @@ html, body, #root {
   outline-offset: 2px;
   border-radius: 2px;
 }
+
+/* ── Walk action toolbar ─────────────────────────────────────────────────── */
+.walk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 255, 255, 0.015);
+  flex-shrink: 0;
+}
+
+.walk-action-btn {
+  background: rgba(0, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 6px 12px;
+  min-height: 30px;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
+  white-space: nowrap;
+}
+.walk-action-btn:hover:not(:disabled) {
+  background: rgba(0, 255, 255, 0.12);
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+.walk-action-btn.active {
+  background: rgba(0, 255, 255, 0.12);
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+.walk-action-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.walk-action-btn:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
 @media (prefers-color-scheme: light) {
   .settings-select { background: rgba(240, 244, 252, 0.9); }
 }
@@ -850,6 +894,72 @@ html, body, #root {
 }
 .settings-input:focus { border-color: var(--cyan); }
 .settings-input:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.walk-action-btn--danger {
+  border-color: rgba(255, 100, 100, 0.5);
+  color: #ff9999;
+}
+.walk-action-btn--danger:hover {
+  background: rgba(255, 50, 50, 0.12);
+  border-color: #ff9999;
+  color: #ff9999;
+}
+
+/* Hidden file input */
+.walk-file-input {
+  position: absolute;
+  width: 1px; height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── Confirm new-walk inline dialog ─────────────────────────────────────── */
+.walk-confirm {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 50, 50, 0.06);
+  flex-shrink: 0;
+}
+.walk-confirm-msg {
+  font-size: 0.78rem;
+  color: #ff9999;
+  line-height: 1.55;
+  margin-bottom: 10px;
+}
+.walk-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Resume saved-walks list ─────────────────────────────────────────────── */
+.resume-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.resume-item {
+  width: 100%;
+  text-align: left;
+  background: rgba(0, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 12px;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  transition: background 0.18s, border-color 0.18s;
+}
+.resume-item:hover {
+  background: rgba(0, 255, 255, 0.08);
+  border-color: var(--cyan);
+}
+.resume-item:focus-visible {
   outline: 3px solid var(--cyan);
   outline-offset: 2px;
   border-radius: 2px;
@@ -975,4 +1085,52 @@ html, body, #root {
   .settings-input,
   .settings-select       { background: rgba(240, 244, 252, 0.9); }
   .toggle-key-btn        { background: rgba(240, 244, 252, 0.9); }
+}
+
+.resume-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+.resume-item-date {
+  font-size: 0.7rem;
+  color: var(--text-mute);
+  flex: 1;
+}
+.resume-item-count {
+  font-size: 0.7rem;
+  color: var(--purple);
+  letter-spacing: 0.06em;
+}
+.resume-item-delete {
+  background: none;
+  border: 1px solid transparent;
+  color: var(--text-mute);
+  cursor: pointer;
+  font-size: 0.72rem;
+  width: 22px; height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 2px;
+  transition: border-color 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.resume-item-delete:hover {
+  border-color: #ff9999;
+  color: #ff9999;
+}
+.resume-item-delete:focus-visible {
+  outline: 3px solid #ff9999;
+  outline-offset: 2px;
+}
+
+.resume-item-path {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  word-break: break-word;
+  white-space: normal;
 }
