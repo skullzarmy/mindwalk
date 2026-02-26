@@ -6,7 +6,7 @@ import { extractWords } from './utils/textProcessing.js';
 import './styles/main.css';
 
 const DEFAULT_TEMPLATE =
-  "Ponder the concept of '{WORD}' deeply. Share your thoughts, associations, and connections in 2-3 paragraphs.";
+  "Ponder the concept of '{WORD}' briefly. Share your key thoughts and connections in 2-3 sentences.";
 
 // Initial decorative words shown before the first AI response
 const SEED_WORDS = [
