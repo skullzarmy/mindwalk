@@ -28,7 +28,7 @@ export default function ChatPanel({ messages, isOpen, onClose }) {
         {messages.length === 0 ? (
           <p className="empty-state">
             No messages yet.<br />
-            Type a thought below or click a word to begin.
+            Select a word or edit your prompt to begin.
           </p>
         ) : (
           messages.map((msg, i) => (
