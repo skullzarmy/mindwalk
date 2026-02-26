@@ -60,7 +60,6 @@ function createWordSprite(word, weight) {
     word,
     weight,
     baseScale: new THREE.Vector3(scaleX, scaleY, 1),
-    baseY: 0,
     phase:      Math.random() * Math.PI * 2,
     floatSpeed: 0.3 + Math.random() * 0.35,
   };
@@ -91,6 +90,11 @@ function createStarField(count = 2500) {
   );
 }
 
+// Reusable vectors for the animation loop – avoids per-frame allocations.
+const _toCamera    = new THREE.Vector3();
+const _hoverTarget = new THREE.Vector3();
+const _hoverScale  = new THREE.Vector3();
+
 /**
  * Fibonacci-sphere distribution for uniform point coverage.
  */
@@ -120,6 +124,7 @@ export default function WordCloud3D({ words, onWordClick, isLoading }) {
   const clockRef   = useRef(new THREE.Clock());
   const raycasterRef = useRef(new THREE.Raycaster());
   const hoveredRef   = useRef(null);
+  const tooltipRef   = useRef(null);
 
   // ── Scene bootstrap (runs once) ──────────────────────────────────────────
   useEffect(() => {
@@ -161,22 +166,35 @@ export default function WordCloud3D({ words, onWordClick, isLoading }) {
       rafRef.current = requestAnimationFrame(animate);
       const t = clock.getElapsedTime();
 
+      const cam = cameraRef.current;
       spritesRef.current.forEach(sprite => {
-        const { phase, floatSpeed, baseScale, baseY } = sprite.userData;
+        const { phase, floatSpeed, baseScale, basePos } = sprite.userData;
 
         // fade in
         if (sprite.material.opacity < 1) {
           sprite.material.opacity = Math.min(1, sprite.material.opacity + 0.025);
         }
 
-        // float
-        sprite.position.y = baseY + Math.sin(t * floatSpeed + phase) * 2.2;
+        const floatY = Math.sin(t * floatSpeed + phase) * 2.2;
 
-        // hover scale
-        const target = sprite === hoveredRef.current
-          ? new THREE.Vector3(baseScale.x * 1.45, baseScale.y * 1.45, 1)
-          : baseScale;
-        sprite.scale.lerp(target, 0.12);
+        if (sprite === hoveredRef.current && cam) {
+          // float toward camera: move 80 units along the camera direction
+          _toCamera.subVectors(cam.position, basePos).normalize().multiplyScalar(80);
+          _hoverTarget.set(
+            basePos.x + _toCamera.x,
+            basePos.y + _toCamera.y + floatY,
+            basePos.z + _toCamera.z,
+          );
+          sprite.position.lerp(_hoverTarget, 0.1);
+          _hoverScale.set(baseScale.x * 2.5, baseScale.y * 2.5, 1);
+          sprite.scale.lerp(_hoverScale, 0.12);
+        } else {
+          // return to base position with float
+          sprite.position.y = basePos.y + floatY;
+          sprite.position.x += (basePos.x - sprite.position.x) * 0.1;
+          sprite.position.z += (basePos.z - sprite.position.z) * 0.1;
+          sprite.scale.lerp(baseScale, 0.12);
+        }
       });
 
       controls.update();
@@ -223,7 +241,7 @@ export default function WordCloud3D({ words, onWordClick, isLoading }) {
       const sprite = createWordSprite(w.word, w.weight);
       const pos    = fibonacciSphere(i, words.length, radius);
       sprite.position.copy(pos);
-      sprite.userData.baseY = pos.y;
+      sprite.userData.basePos = pos.clone();
       scene.add(sprite);
       return sprite;
     });
@@ -248,9 +266,18 @@ export default function WordCloud3D({ words, onWordClick, isLoading }) {
     if (hits.length > 0) {
       hoveredRef.current = hits[0].object;
       mountRef.current.style.cursor = isLoading ? 'wait' : 'pointer';
+      if (tooltipRef.current) {
+        tooltipRef.current.textContent = hits[0].object.userData.word;
+        tooltipRef.current.style.left = `${e.clientX}px`;
+        tooltipRef.current.style.top  = `${e.clientY - 18}px`;
+        tooltipRef.current.style.opacity = '1';
+      }
     } else {
       hoveredRef.current = null;
       mountRef.current.style.cursor = 'default';
+      if (tooltipRef.current) {
+        tooltipRef.current.style.opacity = '0';
+      }
     }
   }, [getIntersects, isLoading]);
 
@@ -263,11 +290,14 @@ export default function WordCloud3D({ words, onWordClick, isLoading }) {
   }, [isLoading, onWordClick, getIntersects]);
 
   return (
-    <div
-      ref={mountRef}
-      className="word-cloud-canvas"
-      onMouseMove={handleMouseMove}
-      onClick={handleClick}
-    />
+    <>
+      <div
+        ref={mountRef}
+        className="word-cloud-canvas"
+        onMouseMove={handleMouseMove}
+        onClick={handleClick}
+      />
+      <div ref={tooltipRef} className="word-tooltip" aria-hidden="true" />
+    </>
   );
 }
