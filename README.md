@@ -63,7 +63,9 @@ The server auto-detects which provider to use from whichever key is set in
 | `google` | [Google Gemini](https://aistudio.google.com/app/apikey) | `GOOGLE_API_KEY` | `gemini-1.5-flash` |
 | `xai` | [xAI / Grok](https://console.x.ai/) | `XAI_API_KEY` | `grok-3-mini` |
 | `digitalocean` | [DigitalOcean GenAI](https://cloud.digitalocean.com/gen-ai) | `DIGITALOCEAN_API_KEY` | configurable |
-| `cloudflare` | [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/) | `CLOUDFLARE_API_KEY` | `@cf/meta/llama-3.1-8b-instruct` |
+| `cloudflare` | [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/) / [AI Gateway](https://developers.cloudflare.com/ai-gateway/usage/chat-completion/) | `CLOUDFLARE_API_KEY` | `@cf/meta/llama-3.1-8b-instruct` |
+
+> **Cloudflare AI Gateway**: set `CLOUDFLARE_GATEWAY_ID` to route requests through the AI Gateway (`gateway.ai.cloudflare.com`) instead of the direct Workers AI REST API. The Gateway provides an OpenAI-compatible chat completions interface with built-in caching, rate limiting, and analytics.
 | `openrouter` | [OpenRouter](https://openrouter.ai/keys) (unified billing) | `OPENROUTER_API_KEY` | `openai/gpt-3.5-turbo` |
 
 Override the model with the corresponding `*_MODEL` env var (e.g.

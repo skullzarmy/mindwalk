@@ -112,14 +112,37 @@ async function callGoogle(messages, maxTokens) {
   return { choices: [{ message: { role: 'assistant', content: text } }] };
 }
 
-// ── Cloudflare Workers AI ─────────────────────────────────────────────────────
+// ── Cloudflare Workers AI / AI Gateway ───────────────────────────────────────
+// When CLOUDFLARE_GATEWAY_ID is set the request is routed through the
+// Cloudflare AI Gateway (https://developers.cloudflare.com/ai-gateway/usage/chat-completion/)
+// which exposes an OpenAI-compatible chat completions endpoint and returns the
+// standard OpenAI response envelope directly.
+// Without a gateway ID, the direct Workers AI REST API is used instead.
 async function callCloudflare(messages, maxTokens) {
   const cfg = PROVIDER_DEFAULTS.cloudflare;
   const apiKey = process.env[cfg.keyVar];
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
   if (!accountId) throw new Error('CLOUDFLARE_ACCOUNT_ID is required for the cloudflare provider');
   const model = process.env[cfg.modelVar] || cfg.model;
+  const gatewayId = process.env.CLOUDFLARE_GATEWAY_ID;
 
+  if (gatewayId) {
+    // AI Gateway – OpenAI-compatible endpoint
+    // URL: https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/workers-ai/v1/chat/completions
+    const response = await fetch(
+      `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/workers-ai/v1/chat/completions`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({ model, messages, max_tokens: maxTokens }),
+      }
+    );
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error?.message || `Cloudflare AI Gateway error (${response.status} ${response.statusText})`);
+    return data; // already OpenAI envelope
+  }
+
+  // Direct Workers AI REST API (no gateway)
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`,
     {
