@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import WordCloud3D   from './components/WordCloud3D.jsx';
 import ChatPanel     from './components/ChatPanel.jsx';
-import PromptEditor  from './components/PromptEditor.jsx';
 import JourneyPanel  from './components/JourneyPanel.jsx';
 import SettingsPanel from './components/SettingsPanel.jsx';
 import { extractWords } from './utils/textProcessing.js';
@@ -242,32 +241,6 @@ export default function App() {
         </div>
         <nav className="hud-controls" aria-label="Application controls">
           <button
-            className={`hud-btn ${colorblindMode ? 'active' : ''}`}
-            onClick={() => setColorblindMode(v => !v)}
-            aria-pressed={colorblindMode}
-            title="Toggle color-blind friendly mode"
-          >
-            ♿ A11Y
-          </button>
-          <button
-            className={`hud-btn ${activePanel === 'map' ? 'active' : ''}`}
-            onClick={() => togglePanel('map')}
-            aria-expanded={activePanel === 'map'}
-            aria-controls="map-panel"
-            title="View journey map"
-          >
-            🗺 MAP
-          </button>
-          <button
-            className={`hud-btn ${activePanel === 'editor' ? 'active' : ''}`}
-            onClick={() => togglePanel('editor')}
-            aria-expanded={activePanel === 'editor'}
-            aria-controls="editor-panel"
-            title="Edit ponder prompt"
-          >
-            ⚙ PROMPT
-          </button>
-          <button
             className={`hud-btn ${activePanel === 'chat' ? 'active' : ''}`}
             onClick={() => togglePanel('chat')}
             aria-expanded={activePanel === 'chat'}
@@ -277,13 +250,22 @@ export default function App() {
             💬 CHAT
           </button>
           <button
+            className={`hud-btn ${activePanel === 'map' ? 'active' : ''}`}
+            onClick={() => togglePanel('map')}
+            aria-expanded={activePanel === 'map'}
+            aria-controls="map-panel"
+            title="View journey map"
+          >
+            🗺 JOURNEY
+          </button>
+          <button
             className={`hud-btn${activePanel === 'settings' ? ' active' : ''}${byokOnly && !hasUserKey() ? ' hud-btn-alert' : ''}`}
             onClick={() => { setWizardMode(false); togglePanel('settings'); }}
             aria-expanded={activePanel === 'settings'}
             aria-controls="settings-panel"
-            title="AI key &amp; settings"
+            title="Settings"
           >
-            🔑 KEYS
+            ⚙ SETTINGS
           </button>
         </nav>
       </header>
@@ -358,12 +340,6 @@ export default function App() {
         isOpen={activePanel === 'chat'}
         onClose={() => setActivePanel(null)}
       />
-      <PromptEditor
-        template={promptTemplate}
-        isOpen={activePanel === 'editor'}
-        onSave={(t) => { setPromptTemplate(t); setActivePanel(null); }}
-        onClose={() => setActivePanel(null)}
-      />
       <JourneyPanel
         wordPath={wordPath}
         isOpen={activePanel === 'map'}
@@ -377,6 +353,10 @@ export default function App() {
       <SettingsPanel
         isOpen={activePanel === 'settings'}
         wizardMode={wizardMode}
+        colorblindMode={colorblindMode}
+        onColorblindModeChange={setColorblindMode}
+        promptTemplate={promptTemplate}
+        onPromptSave={setPromptTemplate}
         onClose={() => { setWizardMode(false); setActivePanel(null); }}
         onSave={() => { setWizardMode(false); setByokOnly(false); setActivePanel(null); }}
       />
