@@ -4,6 +4,7 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { validateChatRequest } from './middleware/validateChatRequest.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -211,12 +212,8 @@ app.get('/api/config', (_req, res) => {
   res.json({ byokOnly: !hasKey, serverProvider: hasKey ? provider : null });
 });
 
-app.post('/api/chat', chatLimiter, async (req, res) => {
+app.post('/api/chat', chatLimiter, validateChatRequest, async (req, res) => {
   const { messages } = req.body;
-
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return res.status(400).json({ error: 'messages array is required' });
-  }
 
   const provider = selectProvider();
   const cfg = PROVIDER_DEFAULTS[provider];
