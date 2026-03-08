@@ -97,3 +97,43 @@ concise.  Override with `AI_MAX_TOKENS=<number>` in `.env`.
 | **⚙ PROMPT** | Edit the ponder-prompt template |
 | **💬 CHAT** | View full conversation history |
 | **Type + EXPLORE** | Send a freeform thought |
+
+## Security model (BYOK mode)
+
+When the server is run without a provider API key, MindWalk enters **BYOK
+(Bring Your Own Key) mode**.  Users enter their own key in the Settings panel.
+The following hardening measures protect that key:
+
+### HTTP security headers (server.js)
+
+Every response sets:
+
+| Header | Value |
+|---|---|
+| `Content-Security-Policy` | `default-src 'self'` + allowlisted AI-provider origins |
+| `X-Content-Type-Options` | `nosniff` |
+| `X-Frame-Options` | `DENY` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+
+CSP prevents injected scripts from exfiltrating keys even if an XSS
+vulnerability exists somewhere in the dependency tree.
+
+### Key storage options (client)
+
+Users choose how their key is stored:
+
+| Mode | Mechanism | Cleared |
+|---|---|---|
+| **Session only** (default) | `sessionStorage` | When the tab closes |
+| **Remember key** | AES-256-GCM encrypted in IndexedDB (Web Crypto API, PBKDF2 key derivation, 100 000 iterations) | Never (until manually cleared) |
+
+**The API key is never written to `localStorage` in plain text.**  On page
+load, if an encrypted key is found, the user is prompted for the passphrase
+before the key is loaded into memory.  The passphrase itself never leaves the
+browser.
+
+### Legacy migration
+
+If a key was stored in plain-text `localStorage` by an older version of the
+app, it is automatically migrated to `sessionStorage` (session-only) and the
+plain-text copy is scrubbed from `localStorage` on first load.
