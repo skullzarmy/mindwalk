@@ -1,5 +1,10 @@
 import { useState, useEffect } from 'react';
-import { getSettings, saveSettings, clearSettings, SUPPORTED_PROVIDERS } from '../utils/aiSettings.js';
+import { getSettings, saveSettings, clearSettings, getApiKey, setApiKey, clearApiKey, SUPPORTED_PROVIDERS } from '../utils/aiSettings.js';
+import { saveEncryptedKey, clearEncryptedKey, saveSessionKey, clearSessionKey, hasEncryptedKey } from '../utils/secureStorage.js';
+
+// Storage mode label copy — kept as constants so wizard and full panel stay in sync
+const LABEL_SESSION   = <><strong>This session only</strong> — cleared when you close this tab</>;
+const LABEL_ENCRYPTED = <><strong>Remember with passphrase</strong> — encrypted in your browser</>;
 
 export default function SettingsPanel({
   isOpen,
@@ -11,14 +16,37 @@ export default function SettingsPanel({
   promptTemplate = '',
   onPromptSave,
 }) {
-  const [settings,      setSettings]      = useState(getSettings);
+  const [settings,      setSettings]      = useState(() => ({ ...getSettings(), apiKey: getApiKey() }));
   const [step,          setStep]          = useState(wizardMode ? 1 : 0); // 0 = full panel, 1-3 = wizard
   const [showKey,       setShowKey]       = useState(false);
   const [promptValue,   setPromptValue]   = useState(promptTemplate);
+  // Storage mode: 'session' (default) or 'encrypted' (IndexedDB + passphrase)
+  const [storageMode,   setStorageMode]   = useState('session');
+  const [passphrase,    setPassphrase]    = useState('');
+  const [showPass,      setShowPass]      = useState(false);
+  const [saveError,     setSaveError]     = useState('');
+  const [isSaving,      setIsSaving]      = useState(false);
+  const [serverHasKey,  setServerHasKey]  = useState(false);
   const headingId = 'settings-panel-title';
 
   // Re-read settings each time panel opens
-  useEffect(() => { if (isOpen) setSettings(getSettings()); }, [isOpen]);
+  useEffect(() => {
+    if (isOpen) {
+      setSettings({ ...getSettings(), apiKey: getApiKey() });
+      setSaveError('');
+      setPassphrase('');
+      // Detect current storage mode
+      hasEncryptedKey().then(has => setStorageMode(has ? 'encrypted' : 'session'));
+      // Check whether the server has its own API key configured
+      fetch('/api/config')
+        .then(r => r.json())
+        .then(data => setServerHasKey(!data.byokOnly))
+        .catch((err) => {
+          console.error('[SettingsPanel] Could not fetch /api/config:', err);
+          setServerHasKey(false);
+        });
+    }
+  }, [isOpen]);
 
   // Sync prompt value when template prop changes or panel opens
   useEffect(() => { if (isOpen) setPromptValue(promptTemplate); }, [isOpen, promptTemplate]);
@@ -28,16 +56,50 @@ export default function SettingsPanel({
 
   const selectedProvider = SUPPORTED_PROVIDERS.find(p => p.id === settings.provider) || SUPPORTED_PROVIDERS[0];
 
-  const handleSave = () => {
-    saveSettings(settings);
-    onSave?.(settings);
-    onClose();
+  const handleSave = async () => {
+    setSaveError('');
+    // Validate passphrase requirement
+    if (storageMode === 'encrypted' && settings.apiKey.trim() && !passphrase.trim()) {
+      setSaveError('A passphrase is required to encrypt your key.');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      // Save non-sensitive settings to localStorage
+      saveSettings(settings);
+
+      if (settings.apiKey.trim()) {
+        if (storageMode === 'encrypted') {
+          // Encrypt key and persist to IndexedDB; clear any session copy
+          await saveEncryptedKey(settings.apiKey, passphrase);
+          clearSessionKey();
+        } else {
+          // Session-only: store in sessionStorage; clear any encrypted copy
+          saveSessionKey(settings.apiKey);
+          await clearEncryptedKey();
+        }
+        // Update in-memory key
+        setApiKey(settings.apiKey);
+      }
+
+      onSave?.(settings);
+      onClose();
+    } catch (err) {
+      setSaveError(err.message || 'Failed to save settings. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleClear = () => {
+  const handleClear = async () => {
     if (window.confirm('Remove your saved API key and settings?')) {
       clearSettings();
-      setSettings(getSettings());
+      clearApiKey();
+      clearSessionKey();
+      await clearEncryptedKey();
+      setSettings({ ...getSettings(), apiKey: '' });
+      setPassphrase('');
+      setStorageMode('session');
     }
   };
 
@@ -120,20 +182,86 @@ export default function SettingsPanel({
                   {showKey ? '🙈' : '👁'}
                 </button>
               </div>
-              <p className="settings-note">
-                🔒 Stored only in your browser's local storage. Never sent to this server.
-                {settings.provider === 'cloudflare-workers' && (
-                  <> Enter as <code>accountId:apiToken</code>.</>
-                )}
-                {settings.provider === 'cloudflare' && (
-                  <> Enter as <code>accountId:gatewayId:apiToken</code>.</>
-                )}
-              </p>
+
+              {/* Storage mode toggle */}
+              <div className="storage-mode-group" role="group" aria-label="Key storage mode">
+                <p className="settings-label" style={{ marginBottom: '6px' }}>HOW TO STORE YOUR KEY</p>
+                <label className="storage-mode-option">
+                  <input
+                    type="radio"
+                    name="wizardStorageMode"
+                    value="session"
+                    checked={storageMode === 'session'}
+                    onChange={() => { setStorageMode('session'); setPassphrase(''); }}
+                  />
+                  <span>{LABEL_SESSION}</span>
+                </label>
+                <label className="storage-mode-option">
+                  <input
+                    type="radio"
+                    name="wizardStorageMode"
+                    value="encrypted"
+                    checked={storageMode === 'encrypted'}
+                    onChange={() => setStorageMode('encrypted')}
+                  />
+                  <span>{LABEL_ENCRYPTED}</span>
+                </label>
+              </div>
+
+              {storageMode === 'encrypted' && (
+                <div className="passphrase-section">
+                  <label className="settings-label" htmlFor="wizard-passphrase">ENCRYPTION PASSPHRASE</label>
+                  <div className="key-input-row">
+                    <input
+                      id="wizard-passphrase"
+                      type={showPass ? 'text' : 'password'}
+                      value={passphrase}
+                      onChange={e => setPassphrase(e.target.value)}
+                      placeholder="Choose a strong passphrase…"
+                      className="settings-input"
+                      aria-label="Encryption passphrase"
+                      autoComplete="new-password"
+                    />
+                    <button
+                      className="toggle-key-btn"
+                      onClick={() => setShowPass(v => !v)}
+                      aria-label={showPass ? 'Hide passphrase' : 'Show passphrase'}
+                    >
+                      {showPass ? '🙈' : '👁'}
+                    </button>
+                  </div>
+                  <p className="settings-note">
+                    You will be prompted for this passphrase each time you open the app.
+                  </p>
+                </div>
+              )}
+
+              {storageMode === 'session' && (
+                <p className="settings-note">
+                  🔒 Key is kept only in memory for this tab — never written to disk.
+                  {settings.provider === 'cloudflare-workers' && (
+                    <> Enter as <code>accountId:apiToken</code>.</>
+                  )}
+                  {settings.provider === 'cloudflare' && (
+                    <> Enter as <code>accountId:gatewayId:apiToken</code>.</>
+                  )}
+                </p>
+              )}
+
+              {saveError && <p className="settings-error" role="alert">{saveError}</p>}
+
               <div className="wizard-nav">
                 <button className="cancel-btn" onClick={() => setStep(1)}>← BACK</button>
                 <button
                   className="save-btn"
-                  onClick={() => setStep(3)}
+                  onClick={() => {
+                    if (storageMode === 'encrypted' && settings.apiKey.trim() && !passphrase.trim()) {
+                      setSaveError('A passphrase is required to encrypt your key.');
+                      return;
+                    }
+                    setSaveError('');
+                    setStep(3);
+                  }}
                   disabled={!settings.apiKey.trim()}
                 >
                   NEXT →
@@ -151,10 +279,17 @@ export default function SettingsPanel({
                 You can change provider, model, or token settings anytime via the <strong>⚙ SETTINGS</strong> button.
               </p>
               <p className="settings-note">
-                🔒 Your key is stored locally and all AI calls go directly from your browser to {selectedProvider.label}.
+                {storageMode === 'encrypted'
+                  ? '🔒 Your key will be encrypted with your passphrase and stored securely. You will be prompted for the passphrase on each visit.'
+                  : '🔒 Your key is stored only in memory for this session. It will be cleared when this tab closes.'}
               </p>
-              <button className="save-btn wizard-next-btn" onClick={handleSave}>
-                START EXPLORING →
+              {saveError && <p className="settings-error" role="alert">{saveError}</p>}
+              <button
+                className="save-btn wizard-next-btn"
+                onClick={handleSave}
+                disabled={isSaving}
+              >
+                {isSaving ? 'SAVING…' : 'START EXPLORING →'}
               </button>
             </div>
           )}
@@ -257,10 +392,81 @@ export default function SettingsPanel({
               {showKey ? '🙈' : '👁'}
             </button>
           </div>
-          {settings.apiKey
-            ? <p className="settings-note">🔒 Stored locally · used only in your browser · never sent to this server.</p>
-            : <p className="settings-note">Leave blank to use server-side key (if configured).</p>
-          }
+
+          {/* Storage mode toggle */}
+          <div className="storage-mode-group" role="group" aria-label="Key storage mode">
+            <p className="settings-label" style={{ marginBottom: '6px', marginTop: '10px' }}>
+              API KEY STORAGE <span style={{ fontWeight: 'normal', fontSize: '0.9em' }}>(your browser only)</span>
+            </p>
+            <label className="storage-mode-option">
+              <input
+                type="radio"
+                name="fullPanelStorageMode"
+                value="session"
+                checked={storageMode === 'session'}
+                onChange={() => { setStorageMode('session'); setPassphrase(''); setSaveError(''); }}
+              />
+              <span>{LABEL_SESSION}</span>
+            </label>
+            <label className="storage-mode-option">
+              <input
+                type="radio"
+                name="fullPanelStorageMode"
+                value="encrypted"
+                checked={storageMode === 'encrypted'}
+                onChange={() => { setStorageMode('encrypted'); setSaveError(''); }}
+              />
+              <span>{LABEL_ENCRYPTED}</span>
+            </label>
+          </div>
+
+          {storageMode === 'encrypted' && (
+            <div className="passphrase-section">
+              <label className="settings-label" htmlFor="full-passphrase">
+                {settings.apiKey.trim() ? 'ENCRYPTION PASSPHRASE' : 'PASSPHRASE (required to re-encrypt on save)'}
+              </label>
+              <div className="key-input-row">
+                <input
+                  id="full-passphrase"
+                  type={showPass ? 'text' : 'password'}
+                  value={passphrase}
+                  onChange={e => setPassphrase(e.target.value)}
+                  placeholder="Enter passphrase…"
+                  className="settings-input"
+                  aria-label="Encryption passphrase"
+                  autoComplete="current-password"
+                />
+                <button
+                  className="toggle-key-btn"
+                  onClick={() => setShowPass(v => !v)}
+                  aria-label={showPass ? 'Hide passphrase' : 'Show passphrase'}
+                >
+                  {showPass ? '🙈' : '👁'}
+                </button>
+              </div>
+              <p className="settings-note">
+                You will be prompted for this passphrase each time you open the app.
+              </p>
+            </div>
+          )}
+
+          {!settings.apiKey ? (
+            <p className="settings-note">
+              {serverHasKey
+                ? "Leave blank to use the server's API key."
+                : 'Enter your own API key to continue.'
+              }
+            </p>
+          ) : (
+            <p className="settings-note">
+              🔒 {storageMode === 'session'
+                ? 'Stored in memory only, never sent to our server.'
+                : 'Encrypted locally in your browser, never sent to our server.'
+              }
+            </p>
+          )}
+
+          {saveError && <p className="settings-error" role="alert">{saveError}</p>}
         </div>
 
         <div className="settings-section">
@@ -300,12 +506,14 @@ export default function SettingsPanel({
         </div>
 
         <div className="editor-actions">
-          <button className="save-btn" onClick={handleSave}>SAVE SETTINGS</button>
-          <button className="cancel-btn" onClick={onClose}>CANCEL</button>
+          <button className="save-btn" onClick={handleSave} disabled={isSaving}>
+            {isSaving ? 'SAVING…' : 'SAVE SETTINGS'}
+          </button>
+          <button className="cancel-btn" onClick={onClose} disabled={isSaving}>CANCEL</button>
         </div>
 
         {settings.apiKey && (
-          <button className="settings-clear-btn" onClick={handleClear}>
+          <button className="settings-clear-btn" onClick={handleClear} disabled={isSaving}>
             CLEAR SAVED KEY
           </button>
         )}

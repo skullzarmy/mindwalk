@@ -5,7 +5,8 @@ import JourneyPanel  from './components/JourneyPanel.jsx';
 import SettingsPanel from './components/SettingsPanel.jsx';
 import { extractWords } from './utils/textProcessing.js';
 
-import { hasUserKey }   from './utils/aiSettings.js';
+import { hasUserKey, setApiKey, consumeLegacyKey } from './utils/aiSettings.js';
+import { hasEncryptedKey, loadEncryptedKey, getSessionKey, saveSessionKey } from './utils/secureStorage.js';
 import { callAIClient } from './utils/aiClient.js';
 import { saveWalk, exportWalk, parseImportedWalk } from './utils/walkStorage.js';
 import './styles/main.css';
@@ -47,6 +48,12 @@ export default function App() {
   const [wordPath,        setWordPath]        = useState([]);
   const [byokOnly,        setByokOnly]        = useState(false);
   const [wizardMode,      setWizardMode]      = useState(false);
+  // Passphrase unlock modal — shown when an encrypted key exists but has not yet
+  // been decrypted for this session.
+  const [showPassphrasePrompt, setShowPassphrasePrompt] = useState(false);
+  const [passphraseInput,      setPassphraseInput]      = useState('');
+  const [passphraseError,      setPassphraseError]      = useState('');
+  const [passphraseLoading,    setPassphraseLoading]    = useState(false);
 
   // keep latest messages in a ref so callbacks don't stale-close over them
   const messagesRef = useRef(messages);
@@ -55,8 +62,90 @@ export default function App() {
   // keep latest wordPath in a ref for the same reason
   const wordPathRef = useRef([]);
 
-  // ── On mount: check if server has a key; enter wizard if BYOK-only ───────
+  // ── On mount: load key from secure storage, then check server config ───────
   useEffect(() => {
+    async function initApp() {
+      // 1. Migrate any legacy plain-text key found in localStorage
+      const legacy = consumeLegacyKey();
+      if (legacy) {
+        setApiKey(legacy);
+        saveSessionKey(legacy); // treat migrated key as session-only going forward
+      }
+
+      // 2. Load session key (covers both fresh session-only saves and migrated keys)
+      if (!hasUserKey()) {
+        const sessionKey = getSessionKey();
+        if (sessionKey) setApiKey(sessionKey);
+      }
+
+      // 3. If still no key in memory, check whether an encrypted key exists
+      if (!hasUserKey()) {
+        const encrypted = await hasEncryptedKey();
+        if (encrypted) {
+          setShowPassphrasePrompt(true);
+          return; // defer server-config check until after unlock
+        }
+      }
+
+      // 4. Check server config
+      checkServerConfig();
+    }
+
+    function checkServerConfig() {
+      fetch('/api/config')
+        .then(r => r.json())
+        .then(({ byokOnly: serverByokOnly }) => {
+          setByokOnly(serverByokOnly);
+          if (serverByokOnly && !hasUserKey()) {
+            setWizardMode(true);
+            setActivePanel('settings');
+          }
+        })
+        .catch(() => {
+          if (!hasUserKey()) {
+            setByokOnly(true);
+            setWizardMode(true);
+            setActivePanel('settings');
+          }
+        });
+    }
+
+    initApp();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Called when the user submits the passphrase to unlock the encrypted key
+  const handlePassphraseUnlock = useCallback(async () => {
+    setPassphraseLoading(true);
+    setPassphraseError('');
+    try {
+      const key = await loadEncryptedKey(passphraseInput);
+      if (key) {
+        setApiKey(key);
+        setShowPassphrasePrompt(false);
+        setPassphraseInput('');
+        // Now proceed with server-config check
+        fetch('/api/config')
+          .then(r => r.json())
+          .then(({ byokOnly: serverByokOnly }) => {
+            setByokOnly(serverByokOnly);
+          })
+          .catch(() => {});
+      }
+    } catch (err) {
+      if (err.message === 'incorrect-passphrase') {
+        setPassphraseError('Incorrect passphrase. Please try again.');
+      } else {
+        setPassphraseError('Failed to decrypt key. Please try again.');
+      }
+    } finally {
+      setPassphraseLoading(false);
+    }
+  }, [passphraseInput]);
+
+  const handlePassphraseSkip = useCallback(() => {
+    setShowPassphrasePrompt(false);
+    setPassphraseInput('');
+    // Fall through to wizard/server-config check
     fetch('/api/config')
       .then(r => r.json())
       .then(({ byokOnly: serverByokOnly }) => {
@@ -67,7 +156,6 @@ export default function App() {
         }
       })
       .catch(() => {
-        // Server unreachable — assume BYOK if user has no key either
         if (!hasUserKey()) {
           setByokOnly(true);
           setWizardMode(true);
@@ -219,6 +307,43 @@ export default function App() {
     <div className={`app${colorblindMode ? ' colorblind-mode' : ''}`}>
       {/* Skip navigation link (WCAG 2.4.1) */}
       <a href="#main-input" className="skip-link">Skip to input</a>
+
+      {/* ── Passphrase unlock modal ── */}
+      {showPassphrasePrompt && (
+        <div className="passphrase-overlay" role="dialog" aria-modal="true" aria-labelledby="passphrase-title">
+          <div className="passphrase-modal">
+            <h2 id="passphrase-title" className="passphrase-title">🔒 Unlock API Key</h2>
+            <p className="passphrase-desc">
+              Your API key is encrypted. Enter your passphrase to unlock it for this session.
+            </p>
+            <input
+              type="password"
+              className="settings-input passphrase-input"
+              value={passphraseInput}
+              onChange={e => setPassphraseInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && !passphraseLoading && passphraseInput && handlePassphraseUnlock()}
+              placeholder="Enter passphrase…"
+              aria-label="Decryption passphrase"
+              autoFocus
+            />
+            {passphraseError && (
+              <p className="passphrase-error" role="alert">{passphraseError}</p>
+            )}
+            <div className="passphrase-actions">
+              <button
+                className="save-btn"
+                onClick={handlePassphraseUnlock}
+                disabled={passphraseLoading || !passphraseInput}
+              >
+                {passphraseLoading ? 'UNLOCKING…' : 'UNLOCK →'}
+              </button>
+              <button className="cancel-btn" onClick={handlePassphraseSkip}>
+                SKIP (enter key manually)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* 3-D canvas fills the whole background */}
       <WordCloud3D
         words={words}

@@ -168,6 +168,23 @@ function callAI(provider, messages, maxTokens) {
   }
 }
 
+// ── Security headers ──────────────────────────────────────────────────────────
+app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy', [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",        // Three.js needs inline styles
+    "connect-src 'self' https://*.openai.com https://*.anthropic.com https://*.googleapis.com https://*.x.ai https://*.digitalocean.app https://*.cloudflarestorage.com https://*.openrouter.ai https://gateway.ai.cloudflare.com https://api.cloudflare.com",
+    "img-src 'self' data:",
+    "font-src 'self'",
+    "frame-ancestors 'none'",
+  ].join('; '));
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
 app.use(cors({ origin: ['http://localhost:5173', `http://localhost:${PORT}`] }));
 app.use(express.json());
 

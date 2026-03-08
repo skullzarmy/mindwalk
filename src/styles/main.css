@@ -1150,3 +1150,105 @@ html, body, #root {
   word-break: break-word;
   white-space: normal;
 }
+
+/* ── Passphrase unlock overlay ──────────────────────────────────────────────── */
+.passphrase-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+.passphrase-modal {
+  background: var(--panel-bg);
+  border: 1px solid var(--cyan);
+  border-radius: 4px;
+  padding: 28px 32px;
+  max-width: 420px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 0 40px rgba(0, 255, 255, 0.15);
+}
+.passphrase-title {
+  font-size: 1rem;
+  letter-spacing: 0.12em;
+  color: var(--cyan);
+  margin: 0;
+}
+.passphrase-desc {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  margin: 0;
+  line-height: 1.5;
+}
+.passphrase-input {
+  width: 100%;
+}
+.passphrase-error {
+  font-size: 0.78rem;
+  color: #ff6b6b;
+  margin: 0;
+}
+.passphrase-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.passphrase-actions .save-btn   { flex: 1; }
+.passphrase-actions .cancel-btn { flex: 0 0 auto; font-size: 0.72rem; }
+
+/* ── Storage mode radio group ────────────────────────────────────────────────── */
+.storage-mode-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.storage-mode-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.80rem;
+  color: var(--text-dim);
+  cursor: pointer;
+  line-height: 1.4;
+}
+.storage-mode-option input[type="radio"] {
+  margin-top: 2px;
+  accent-color: var(--cyan);
+  flex-shrink: 0;
+}
+.storage-mode-option strong {
+  color: var(--text);
+}
+
+/* ── Passphrase sub-section inside settings ──────────────────────────────────── */
+.passphrase-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 255, 255, 0.18);
+  border-radius: 3px;
+  background: rgba(0, 255, 255, 0.04);
+}
+
+/* ── Settings error ─────────────────────────────────────────────────────────── */
+.settings-error {
+  font-size: 0.78rem;
+  color: #ff6b6b;
+  margin: 0;
+}
+
+@media (prefers-color-scheme: light) {
+  .passphrase-modal {
+    background: var(--panel-bg);
+    border-color: #006b8f;
+  }
+  .passphrase-title { color: #006b8f; }
+  .passphrase-section { border-color: rgba(0, 107, 143, 0.25); background: rgba(0, 107, 143, 0.04); }
+}
