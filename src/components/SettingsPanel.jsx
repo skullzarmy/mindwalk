@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react';
 import { getSettings, saveSettings, clearSettings, getApiKey, setApiKey, clearApiKey, SUPPORTED_PROVIDERS } from '../utils/aiSettings.js';
 import { saveEncryptedKey, clearEncryptedKey, saveSessionKey, clearSessionKey, hasEncryptedKey } from '../utils/secureStorage.js';
 
+// Storage mode label copy — kept as constants so wizard and full panel stay in sync
+const LABEL_SESSION   = <><strong>This session only</strong> — cleared when you close this tab</>;
+const LABEL_ENCRYPTED = <><strong>Remember with passphrase</strong> — encrypted in your browser</>;
+
 export default function SettingsPanel({
   isOpen,
   onClose,
@@ -37,7 +41,10 @@ export default function SettingsPanel({
       fetch('/api/config')
         .then(r => r.json())
         .then(data => setServerHasKey(!data.byokOnly))
-        .catch(() => setServerHasKey(false));
+        .catch((err) => {
+          console.error('[SettingsPanel] Could not fetch /api/config:', err);
+          setServerHasKey(false);
+        });
     }
   }, [isOpen]);
 
@@ -187,7 +194,7 @@ export default function SettingsPanel({
                     checked={storageMode === 'session'}
                     onChange={() => { setStorageMode('session'); setPassphrase(''); }}
                   />
-                  <span><strong>This session only</strong> — cleared when tab closes</span>
+                  <span>{LABEL_SESSION}</span>
                 </label>
                 <label className="storage-mode-option">
                   <input
@@ -197,7 +204,7 @@ export default function SettingsPanel({
                     checked={storageMode === 'encrypted'}
                     onChange={() => setStorageMode('encrypted')}
                   />
-                  <span><strong>Remember with passphrase</strong> — encrypted in your browser</span>
+                  <span>{LABEL_ENCRYPTED}</span>
                 </label>
               </div>
 
@@ -399,7 +406,7 @@ export default function SettingsPanel({
                 checked={storageMode === 'session'}
                 onChange={() => { setStorageMode('session'); setPassphrase(''); setSaveError(''); }}
               />
-              <span><strong>This session only</strong> — cleared when you close this tab</span>
+              <span>{LABEL_SESSION}</span>
             </label>
             <label className="storage-mode-option">
               <input
@@ -409,7 +416,7 @@ export default function SettingsPanel({
                 checked={storageMode === 'encrypted'}
                 onChange={() => { setStorageMode('encrypted'); setSaveError(''); }}
               />
-              <span><strong>Remember with passphrase</strong> — encrypted in your browser</span>
+              <span>{LABEL_ENCRYPTED}</span>
             </label>
           </div>
 
