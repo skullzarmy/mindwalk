@@ -335,8 +335,8 @@ app.post('/api/chat', adaptiveChatLimiter, async (req, res) => {
     checkTokenQuota(req.ip, estimatedTokens);
   } catch (err) {
     res.setHeader('Retry-After', err.retryAfter);
-    const retryMin = Math.ceil(err.retryAfter / 60);
-    const retryMsg = retryMin > 0
+    const retryMin = Math.floor(err.retryAfter / 60);
+    const retryMsg = err.retryAfter >= 60
       ? `${retryMin} minute(s)`
       : `${err.retryAfter} second(s)`;
     return res.status(429).json({
