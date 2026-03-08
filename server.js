@@ -250,10 +250,12 @@ const tokenCleanupInterval = setInterval(() => {
 }, 15 * 60 * 1000);
 
 // Allow graceful shutdown — clear the interval so the process can exit cleanly.
+// Allow graceful shutdown — clear the interval when the process receives a
+// shutdown signal. Actual process exit and HTTP server shutdown should be
+// handled elsewhere.
 for (const signal of ['SIGTERM', 'SIGINT']) {
   process.once(signal, () => {
     clearInterval(tokenCleanupInterval);
-    process.exit(0);
   });
 }
 
