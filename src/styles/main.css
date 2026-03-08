@@ -889,6 +889,21 @@ html, body, #root {
   .settings-select { background: rgba(240, 244, 252, 0.9); }
 }
 
+/* Path color picker */
+.settings-path-color-input {
+  width: 48px;
+  height: 32px;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 2px;
+}
+.settings-path-color-input:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+}
+
 /* Key input row: input + toggle-visibility button side by side */
 .key-input-row {
   display: flex;

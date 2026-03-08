@@ -15,6 +15,12 @@ export default function SettingsPanel({
   onColorblindModeChange,
   promptTemplate = '',
   onPromptSave,
+  showPath = true,
+  onShowPathChange,
+  pathColor = '#00ffff',
+  onPathColorChange,
+  pathStyle = 'line',
+  onPathStyleChange,
 }) {
   const [settings,      setSettings]      = useState(() => ({ ...getSettings(), apiKey: getApiKey() }));
   const [step,          setStep]          = useState(wizardMode ? 1 : 0); // 0 = full panel, 1-3 = wizard
@@ -327,6 +333,44 @@ export default function SettingsPanel({
             />
             <span>Color-blind friendly mode</span>
           </label>
+        </div>
+
+        <div className="settings-section">
+          <span className="settings-label">PATH VISUALIZATION</span>
+          <label className="settings-toggle-row">
+            <input
+              type="checkbox"
+              checked={showPath}
+              onChange={e => onShowPathChange?.(e.target.checked)}
+              aria-label="Toggle exploration path visibility"
+            />
+            <span>Show exploration path</span>
+          </label>
+          <label htmlFor="settings-path-style" className="settings-label" style={{ marginTop: '6px' }}>
+            PATH STYLE
+          </label>
+          <select
+            id="settings-path-style"
+            value={pathStyle}
+            onChange={e => onPathStyleChange?.(e.target.value)}
+            className="settings-select"
+            aria-label="Path style"
+          >
+            <option value="line">Simple line</option>
+            <option value="tube">3D tube</option>
+            <option value="particles">Particle trail</option>
+          </select>
+          <label htmlFor="settings-path-color" className="settings-label" style={{ marginTop: '6px' }}>
+            PATH COLOR
+          </label>
+          <input
+            id="settings-path-color"
+            type="color"
+            value={pathColor}
+            onChange={e => onPathColorChange?.(e.target.value)}
+            className="settings-path-color-input"
+            aria-label="Path color"
+          />
         </div>
 
         <div className="settings-section">
