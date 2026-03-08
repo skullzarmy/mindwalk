@@ -187,9 +187,6 @@ export default function WordCloud3D({ words, onWordClick, isLoading, colorblindM
   const raycasterRef = useRef(new THREE.Raycaster());
   const hoveredRef   = useRef(null);
   const tooltipRef   = useRef(null);
-  // Cache of word sprites keyed by `${word}-${weight}-${theme}-${colorblindMode}`
-  // to avoid recreating identical sprites across word-cloud rebuilds.
-  const spriteCacheRef = useRef(new Map());
   // Media queries for user preferences
   const isLightMode    = typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: light)').matches;
   const reducedMotion  = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -308,14 +305,6 @@ export default function WordCloud3D({ words, onWordClick, isLoading, colorblindM
       if (mount.contains(renderer.domElement)) {
         mount.removeChild(renderer.domElement);
       }
-
-      // Flush the sprite cache so cached GPU resources are also freed
-      spriteCacheRef.current.forEach(sprite => {
-        if (sprite.material) {
-          disposeMaterial(sprite.material);
-        }
-      });
-      spriteCacheRef.current.clear();
     };
   }, []);
 
@@ -324,50 +313,28 @@ export default function WordCloud3D({ words, onWordClick, isLoading, colorblindM
     const scene = sceneRef.current;
     if (!scene) return;
 
-    // Remove old sprites from the scene (do NOT dispose yet – they may stay in cache)
-    spritesRef.current.forEach(s => scene.remove(s));
+    // Dispose and remove old sprites
+    spritesRef.current.forEach(s => {
+      scene.remove(s);
+      if (s.material) {
+        disposeMaterial(s.material);
+      }
+    });
     hoveredRef.current = null;
     spritesRef.current = [];
 
     if (!words?.length) return;
 
-    const themeKey = isLightMode ? 'light' : 'dark';
-    const cbKey    = colorblindMode ? 'cb' : 'normal';
-    const usedKeys = new Set();
-
     const radius = 100;
     const newSprites = words.map((w, i) => {
-      const cacheKey = `${w.word}-${w.weight}-${themeKey}-${cbKey}`;
-      usedKeys.add(cacheKey);
-
-      let sprite = spriteCacheRef.current.get(cacheKey);
-      if (!sprite) {
-        sprite = createWordSprite(w.word, w.weight, isLightMode, colorblindMode);
-        spriteCacheRef.current.set(cacheKey, sprite);
-      }
-
-      const pos = fibonacciSphere(i, words.length, radius);
+      const sprite = createWordSprite(w.word, w.weight, isLightMode, colorblindMode);
+      const pos    = fibonacciSphere(i, words.length, radius);
       sprite.position.copy(pos);
       sprite.userData.basePos = pos.clone();
-      // phase/floatSpeed/baseScale are visual properties derived from the
-      // word itself, so they are intentionally preserved when reusing a
-      // cached sprite.  Only position-dependent data is updated here.
-      // Reset opacity so the sprite fades in when reused in a new cloud
-      sprite.material.opacity = 0;
       scene.add(sprite);
       return sprite;
     });
     spritesRef.current = newSprites;
-
-    // Evict cached sprites that are no longer in use
-    spriteCacheRef.current.forEach((sprite, key) => {
-      if (!usedKeys.has(key)) {
-        if (sprite.material) {
-          disposeMaterial(sprite.material);
-        }
-        spriteCacheRef.current.delete(key);
-      }
-    });
   }, [words, colorblindMode, isLightMode]);
 
   // ── Mouse interaction ─────────────────────────────────────────────────────
