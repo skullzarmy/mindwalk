@@ -137,15 +137,34 @@ headers so clients can pace themselves:
 | `RateLimit-Reset` | Timestamp when the window resets |
 | `Retry-After` | Seconds to wait after a 429 token-quota response |
 
-When a limit is exceeded the server returns `HTTP 429` with a JSON body:
+When a limit is exceeded the server returns `HTTP 429` with a JSON body.
+There are two distinct 429 shapes depending on which limit was hit:
+
+**Request-count limit** (applies to all rate-limited endpoints):
 
 ```json
 {
   "error": "Rate limit exceeded",
-  "retryAfter": "15 minutes",
+  "retryAfter": "3 minute(s)",
   "hint": "MindWalk limits requests to prevent abuse. Try again shortly."
 }
 ```
+
+`retryAfter` reflects the actual time remaining in the current window (e.g.
+`"3 minute(s)"` or `"45 second(s)"`), not a fixed interval.
+
+**Token quota limit** (`/api/chat` only — hourly token budget):
+
+```json
+{
+  "error": "Token quota exceeded",
+  "retryAfter": "42 minute(s)",
+  "hint": "You have used your hourly token budget. Try again in about 42 minute(s)."
+}
+```
+
+Token-quota responses also include a `Retry-After` header with the number of
+seconds until the quota window resets.
 
 ## Security model (BYOK mode)
 
