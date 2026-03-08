@@ -298,10 +298,12 @@ const byokLimiter = rateLimit({
   },
 });
 
-// Phase 1 / Phase 3: apply the right limiter depending on who is paying
+// Phase 1 / Phase 3: apply the rate limiter.
+// NOTE: BYOK proxying is not implemented yet, and /api/chat always uses the
+// server-side API key. To avoid clients bypassing the stricter server-key
+// limit via an untrusted header, always apply the serverKeyLimiter here.
 function adaptiveChatLimiter(req, res, next) {
-  const isByok = req.headers['x-mindwalk-byok'] === 'true';
-  return (isByok ? byokLimiter : serverKeyLimiter)(req, res, next);
+  return serverKeyLimiter(req, res, next);
 }
 
 // Serve built frontend in production
