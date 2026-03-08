@@ -45,6 +45,9 @@ export default function App() {
   const [lastWord,        setLastWord]        = useState(null);
   const [colorblindMode,  setColorblindMode]  = useState(false);
   const [wordPath,        setWordPath]        = useState([]);
+  const [showPath,        setShowPath]        = useState(true);
+  const [pathColor,       setPathColor]       = useState('#00ffff');
+  const [pathStyle,       setPathStyle]       = useState('line');
   const [byokOnly,        setByokOnly]        = useState(false);
   const [wizardMode,      setWizardMode]      = useState(false);
 
@@ -167,6 +170,15 @@ export default function App() {
     setError(null);
   }, []);
 
+  /** Branch the walk from an earlier path index (Phase 3 interactive path) */
+  const handleBranchFromPath = useCallback((index) => {
+    const newPath = wordPath.slice(0, index + 1);
+    wordPathRef.current = newPath;
+    setWordPath(newPath);
+    // Trim conversation history: each word click produces ~2 messages (user + assistant)
+    setMessages(prev => prev.slice(0, (index + 1) * 2));
+  }, [wordPath]);
+
   /** Persist the current path to localStorage */
   const handleSaveWalk = useCallback(() => {
     if (wordPathRef.current.length > 0) {
@@ -225,6 +237,11 @@ export default function App() {
         onWordClick={handleWordClick}
         isLoading={isLoading}
         colorblindMode={colorblindMode}
+        wordPath={wordPath}
+        showPath={showPath}
+        pathColor={pathColor}
+        pathStyle={pathStyle}
+        onBranchFromPath={handleBranchFromPath}
       />
 
       {/* Corner HUD brackets */}
@@ -357,6 +374,12 @@ export default function App() {
         onColorblindModeChange={setColorblindMode}
         promptTemplate={promptTemplate}
         onPromptSave={setPromptTemplate}
+        showPath={showPath}
+        onShowPathChange={setShowPath}
+        pathColor={pathColor}
+        onPathColorChange={setPathColor}
+        pathStyle={pathStyle}
+        onPathStyleChange={setPathStyle}
         onClose={() => { setWizardMode(false); setActivePanel(null); }}
         onSave={() => { setWizardMode(false); setByokOnly(false); setActivePanel(null); }}
       />
