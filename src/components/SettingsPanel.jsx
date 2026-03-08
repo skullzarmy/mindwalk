@@ -22,6 +22,7 @@ export default function SettingsPanel({
   const [showPass,      setShowPass]      = useState(false);
   const [saveError,     setSaveError]     = useState('');
   const [isSaving,      setIsSaving]      = useState(false);
+  const [serverHasKey,  setServerHasKey]  = useState(false);
   const headingId = 'settings-panel-title';
 
   // Re-read settings each time panel opens
@@ -32,6 +33,11 @@ export default function SettingsPanel({
       setPassphrase('');
       // Detect current storage mode
       hasEncryptedKey().then(has => setStorageMode(has ? 'encrypted' : 'session'));
+      // Check whether the server has its own API key configured
+      fetch('/api/config')
+        .then(r => r.json())
+        .then(data => setServerHasKey(!data.byokOnly))
+        .catch(() => setServerHasKey(false));
     }
   }, [isOpen]);
 
@@ -191,7 +197,7 @@ export default function SettingsPanel({
                     checked={storageMode === 'encrypted'}
                     onChange={() => setStorageMode('encrypted')}
                   />
-                  <span><strong>Remember key</strong> — encrypted with a passphrase</span>
+                  <span><strong>Remember with passphrase</strong> — encrypted in your browser</span>
                 </label>
               </div>
 
@@ -382,7 +388,9 @@ export default function SettingsPanel({
 
           {/* Storage mode toggle */}
           <div className="storage-mode-group" role="group" aria-label="Key storage mode">
-            <p className="settings-label" style={{ marginBottom: '6px', marginTop: '10px' }}>KEY STORAGE</p>
+            <p className="settings-label" style={{ marginBottom: '6px', marginTop: '10px' }}>
+              API KEY STORAGE <span style={{ fontWeight: 'normal', fontSize: '0.9em' }}>(your browser only)</span>
+            </p>
             <label className="storage-mode-option">
               <input
                 type="radio"
@@ -391,7 +399,7 @@ export default function SettingsPanel({
                 checked={storageMode === 'session'}
                 onChange={() => { setStorageMode('session'); setPassphrase(''); setSaveError(''); }}
               />
-              <span><strong>Session only</strong> — cleared when tab closes</span>
+              <span><strong>This session only</strong> — cleared when you close this tab</span>
             </label>
             <label className="storage-mode-option">
               <input
@@ -401,7 +409,7 @@ export default function SettingsPanel({
                 checked={storageMode === 'encrypted'}
                 onChange={() => { setStorageMode('encrypted'); setSaveError(''); }}
               />
-              <span><strong>Remember key</strong> — encrypted with a passphrase</span>
+              <span><strong>Remember with passphrase</strong> — encrypted in your browser</span>
             </label>
           </div>
 
@@ -435,12 +443,21 @@ export default function SettingsPanel({
             </div>
           )}
 
-          {!settings.apiKey
-            ? <p className="settings-note">Leave blank to use server-side key (if configured).</p>
-            : storageMode === 'session'
-              ? <p className="settings-note">🔒 Key kept in memory only · cleared when this tab closes · never written to disk.</p>
-              : null
-          }
+          {!settings.apiKey ? (
+            <p className="settings-note">
+              {serverHasKey
+                ? "Leave blank to use the server's API key."
+                : 'Enter your own API key to continue.'
+              }
+            </p>
+          ) : (
+            <p className="settings-note">
+              🔒 {storageMode === 'session'
+                ? 'Stored in memory only, never sent to our server.'
+                : 'Encrypted locally in your browser, never sent to our server.'
+              }
+            </p>
+          )}
 
           {saveError && <p className="settings-error" role="alert">{saveError}</p>}
         </div>
