@@ -191,7 +191,12 @@ app.use(express.json());
 // ── Token quota tracking (Phase 4) ───────────────────────────────────────────
 // Tracks per-IP estimated token spend; resets each hour.
 // Uses a conservative 4-chars-per-token heuristic (no tiktoken dependency).
-const TOKEN_QUOTA_PER_HOUR = parseInt(process.env.TOKEN_QUOTA_PER_HOUR || '10000', 10);
+const DEFAULT_TOKEN_QUOTA_PER_HOUR = 10000;
+const parsedTokenQuota = parseInt(process.env.TOKEN_QUOTA_PER_HOUR, 10);
+const TOKEN_QUOTA_PER_HOUR =
+  Number.isFinite(parsedTokenQuota) && parsedTokenQuota > 0
+    ? parsedTokenQuota
+    : DEFAULT_TOKEN_QUOTA_PER_HOUR;
 const TOKEN_WINDOW_MS      = 60 * 60 * 1000; // 1 hour
 const tokenUsage           = new Map(); // ip → { tokens: number, resetAt: timestamp }
 
