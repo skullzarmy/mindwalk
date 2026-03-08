@@ -218,10 +218,23 @@ function checkTokenQuota(ip, tokensRequested) {
     throw err;
   }
 
-  quota.tokens += tokensRequested;
+  // This function now only checks quota and updates the window metadata.
+  // Actual token consumption should be recorded via commitTokenUsage(...)
   tokenUsage.set(ip, quota);
 }
 
+function commitTokenUsage(ip, tokensUsed) {
+  const now   = Date.now();
+  const quota = tokenUsage.get(ip) || { tokens: 0, resetAt: now + TOKEN_WINDOW_MS };
+
+  if (now > quota.resetAt) {
+    quota.tokens  = 0;
+    quota.resetAt = now + TOKEN_WINDOW_MS;
+  }
+
+  quota.tokens += tokensUsed;
+  tokenUsage.set(ip, quota);
+}
 // Periodically prune stale entries to prevent unbounded memory growth.
 // Run every 15 minutes so cleanup work is spread out rather than batched hourly.
 const tokenCleanupInterval = setInterval(() => {
