@@ -98,6 +98,55 @@ concise.  Override with `AI_MAX_TOKENS=<number>` in `.env`.
 | **💬 CHAT** | View full conversation history |
 | **Type + EXPLORE** | Send a freeform thought |
 
+## Rate limiting
+
+MindWalk's server enforces layered rate limits to prevent abuse and control AI API costs.
+
+### Request limits (per IP)
+
+| Endpoint | Window | Limit | Who it protects |
+|---|---|---|---|
+| `POST /api/chat` (server key) | 15 min | **20 requests** | Server API budget |
+| `POST /api/chat` (BYOK¹) | 15 min | **50 requests** | Fair-use for self-funded calls |
+| `GET /api/config` | 15 min | 100 requests | Config polling |
+| SPA static fallback | 1 min | 200 requests | File-system flooding |
+
+¹ BYOK requests must include the `X-MindWalk-BYOK: true` header.
+
+### Token quota (per IP, per hour)
+
+In addition to request-count limits, the server tracks an estimated token spend
+per IP and rejects requests that would exceed **10,000 tokens / hour** (default).
+Tokens are estimated at **4 characters ≈ 1 token** — no external dependency required.
+
+Override the hourly token budget with the `TOKEN_QUOTA_PER_HOUR` env var:
+
+```bash
+TOKEN_QUOTA_PER_HOUR=5000  # stricter budget
+```
+
+### Rate-limit response headers
+
+Every `/api/chat` and `/api/config` response includes standard rate-limit
+headers so clients can pace themselves:
+
+| Header | Meaning |
+|---|---|
+| `RateLimit-Limit` | Maximum requests allowed in the current window |
+| `RateLimit-Remaining` | Requests remaining in the current window |
+| `RateLimit-Reset` | Timestamp when the window resets |
+| `Retry-After` | Seconds to wait after a 429 token-quota response |
+
+When a limit is exceeded the server returns `HTTP 429` with a JSON body:
+
+```json
+{
+  "error": "Rate limit exceeded",
+  "retryAfter": "15 minutes",
+  "hint": "MindWalk limits requests to prevent abuse. Try again shortly."
+}
+```
+
 ## Security model (BYOK mode)
 
 When the server is run without a provider API key, MindWalk enters **BYOK
