@@ -125,7 +125,7 @@ Users choose how their key is stored:
 | Mode | Mechanism | Cleared |
 |---|---|---|
 | **Session only** (default) | `sessionStorage` | When the tab closes |
-| **Remember key** | AES-256-GCM encrypted in IndexedDB (Web Crypto API, PBKDF2 key derivation, 100 000 iterations) | Never (until manually cleared) |
+| **Remember key** | AES-256-GCM encrypted in IndexedDB (Web Crypto API, PBKDF2 key derivation, 100,000 iterations) | Never (until manually cleared) |
 
 **The API key is never written to `localStorage` in plain text.**  On page
 load, if an encrypted key is found, the user is prompted for the passphrase
