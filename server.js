@@ -261,17 +261,34 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
 
 // ── Rate limiters (Phase 1 + 2 + 3) ──────────────────────────────────────────
 
+// Shared handler factory: computes the actual time remaining in the current
+// window from req.rateLimit.resetTime so the JSON retryAfter is accurate even
+// when a client hits the limit near the end of a window.
+function buildRateLimitHandler(hint) {
+  return (req, res) => {
+    const resetTime  = req.rateLimit?.resetTime;
+    const secondsLeft = resetTime
+      ? Math.max(0, Math.ceil((resetTime.getTime() - Date.now()) / 1000))
+      : 15 * 60;
+    const retryMin = Math.floor(secondsLeft / 60);
+    const retryMsg = secondsLeft >= 60
+      ? `${retryMin} minute(s)`
+      : `${secondsLeft} second(s)`;
+    res.status(429).json({
+      error:      'Rate limit exceeded',
+      retryAfter: retryMsg,
+      hint,
+    });
+  };
+}
+
 // Phase 2: permissive limiter for non-AI endpoints (config, static)
 const configLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  message: {
-    error:      'Rate limit exceeded',
-    retryAfter: '15 minutes',
-    hint:       'Too many requests. Try again shortly.',
-  },
+  handler: buildRateLimitHandler('Too many requests. Try again shortly.'),
 });
 
 // Phase 3: adaptive limiter — stricter when the server's own API key is used,
@@ -281,11 +298,7 @@ const serverKeyLimiter = rateLimit({
   max: 20,                   // strict: 20 req / 15 min (server pays)
   standardHeaders: true,
   legacyHeaders: false,
-  message: {
-    error:      'Rate limit exceeded',
-    retryAfter: '15 minutes',
-    hint:       'MindWalk limits requests to prevent abuse. Try again shortly.',
-  },
+  handler: buildRateLimitHandler('MindWalk limits requests to prevent abuse. Try again shortly.'),
 });
 
 const byokLimiter = rateLimit({
@@ -293,11 +306,7 @@ const byokLimiter = rateLimit({
   max: 50,                   // looser: 50 req / 15 min (client pays)
   standardHeaders: true,
   legacyHeaders: false,
-  message: {
-    error:      'Rate limit exceeded',
-    retryAfter: '15 minutes',
-    hint:       'MindWalk limits requests to prevent abuse. Try again shortly.',
-  },
+  handler: buildRateLimitHandler('MindWalk limits requests to prevent abuse. Try again shortly.'),
 });
 
 // Phase 1 / Phase 3: apply the rate limiter.
