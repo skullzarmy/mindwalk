@@ -3,7 +3,7 @@
 // browser so the user's key never leaves their device.
 // Mirrors the server-side provider logic in server.js but runs in the client.
 
-import { getSettings } from './aiSettings.js';
+import { getSettings, getApiKey } from './aiSettings.js';
 
 const PROVIDER_URLS = {
   openai:     'https://api.openai.com/v1',
@@ -98,7 +98,8 @@ async function callCloudflareGateway(apiKey, model, messages, maxTokens) {
 
 // ── Public dispatcher ─────────────────────────────────────────────────────
 export async function callAIClient(messages) {
-  const { provider, apiKey, model, maxTokens } = getSettings();
+  const { provider, model, maxTokens } = getSettings();
+  const apiKey        = getApiKey();
   const baseUrl       = PROVIDER_URLS[provider];
   const resolvedModel = model || { openai: 'gpt-3.5-turbo', anthropic: 'claude-haiku-4-5', google: 'gemini-1.5-flash', xai: 'grok-3-mini', openrouter: 'openai/gpt-3.5-turbo', 'cloudflare-workers': '@cf/meta/llama-3.1-8b-instruct', cloudflare: '@cf/meta/llama-3.1-8b-instruct' }[provider] || 'gpt-3.5-turbo';
   const resolvedMax   = maxTokens || 150;

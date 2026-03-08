@@ -4,6 +4,42 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { monitorMemory } from '../utils/memoryMonitor.js';
 
 // ---------------------------------------------------------------------------
+// Path helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a CSS hex color string (#rgb or #rrggbb) into an integer for THREE.js.
+ * Falls back to 0x00ffff (cyan) for invalid input.
+ */
+function parsePathColor(hex) {
+  if (!hex || typeof hex !== 'string') return 0x00ffff;
+  const cleaned = hex.replace('#', '');
+  const expanded = cleaned.length === 3
+    ? cleaned.split('').map(c => c + c).join('')
+    : cleaned;
+  const n = parseInt(expanded, 16);
+  return isNaN(n) ? 0x00ffff : n;
+}
+
+// Path animation: target ~800 ms at 60 fps → 0.021 ≈ 1/48 of progress per frame
+const PATH_ANIMATION_SPEED   = 0.021;
+const TUBE_PATH_OPACITY      = 0.7;
+
+// Curve sampling: minimum 50 segments, or 20 per control point (whichever is more)
+const MIN_CURVE_SEGMENTS     = 50;
+const SEGMENTS_PER_POINT     = 20;
+
+// Sphere marker geometry
+const MARKER_RADIUS_LAST     = 0.8;   // endpoint marker (slightly larger)
+const MARKER_RADIUS_DEFAULT  = 0.5;
+const MARKER_GEOMETRY_DETAIL = 8;
+
+// Tube path geometry
+const TUBE_TUBULAR_SEGMENTS  = 64;
+const TUBE_RADIUS            = 0.2;
+const TUBE_RADIAL_SEGMENTS   = 8;
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -175,7 +211,17 @@ function disposeSceneObjects(root) {
 // Component
 // ---------------------------------------------------------------------------
 
-export default function WordCloud3D({ words, onWordClick, isLoading, colorblindMode = false }) {
+export default function WordCloud3D({
+  words,
+  onWordClick,
+  isLoading,
+  colorblindMode = false,
+  wordPath = [],
+  showPath = true,
+  pathColor = '#00ffff',
+  pathStyle = 'line',
+  onBranchFromPath,
+}) {
   const mountRef   = useRef(null);
   const sceneRef   = useRef(null);
   const cameraRef  = useRef(null);
@@ -187,6 +233,19 @@ export default function WordCloud3D({ words, onWordClick, isLoading, colorblindM
   const raycasterRef = useRef(new THREE.Raycaster());
   const hoveredRef   = useRef(null);
   const tooltipRef   = useRef(null);
+
+  // Path-related refs
+  // pathObjectsRef: all Three.js objects added to scene for the path (line + markers)
+  const pathObjectsRef   = useRef([]);
+  // pathMarkersRef: just the sphere marker meshes (for raycasting)
+  const pathMarkersRef   = useRef([]);
+  // wordPositionsRef: Map<word, THREE.Vector3> populated when sprites are built
+  const wordPositionsRef = useRef(new Map());
+  // pathAnimRef: drives the draw-range grow animation each frame
+  const pathAnimRef      = useRef({ progress: 1, totalPoints: 0, pathMesh: null, style: 'line' });
+  // prevPathLenRef: number of valid control points on last path build (for animation start)
+  const prevPathLenRef   = useRef(0);
+
   // Media queries for user preferences
   const isLightMode    = typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: light)').matches;
   const reducedMotion  = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -270,6 +329,19 @@ export default function WordCloud3D({ words, onWordClick, isLoading, colorblindM
         }
       });
 
+      // ── Path grow animation ──────────────────────────────────────────────
+      const pa = pathAnimRef.current;
+      if (pa.progress < 1 && pa.pathMesh) {
+        pa.progress = Math.min(1, pa.progress + PATH_ANIMATION_SPEED);
+        if (pa.style === 'tube') {
+          // TubeGeometry doesn't support drawRange; fade in opacity instead
+          pa.pathMesh.material.opacity = pa.progress * TUBE_PATH_OPACITY;
+        } else {
+          const visible = Math.max(2, Math.floor(pa.totalPoints * pa.progress));
+          pa.pathMesh.geometry.setDrawRange(0, visible);
+        }
+      }
+
       controls.update();
       renderer.render(scene, camera);
     }
@@ -288,9 +360,30 @@ export default function WordCloud3D({ words, onWordClick, isLoading, colorblindM
 
       // Cancel animation loop before anything else
       cancelAnimationFrame(rafRef.current);
+}
+    window.addEventListener('resize', onResize);
+
+    return () => {
+      window.removeEventListener('resize', onResize);
+
+      // Cancel animation loop before anything else
+      cancelAnimationFrame(rafRef.current);
 
       // Dispose OrbitControls
       controls.dispose();
+
+      // Dispose path objects before renderer cleanup
+      pathObjectsRef.current.forEach(obj => {
+        scene.remove(obj);
+        obj.geometry?.dispose();
+        if (Array.isArray(obj.material)) {
+          obj.material.forEach(m => m.dispose());
+        } else {
+          obj.material?.dispose();
+        }
+      });
+      pathObjectsRef.current = [];
+      pathMarkersRef.current = [];
 
       // Dispose every geometry, material, and texture in the scene
       disposeSceneObjects(scene);
@@ -298,6 +391,14 @@ export default function WordCloud3D({ words, onWordClick, isLoading, colorblindM
 
       // Dispose renderer and force the WebGL context to be released so the
       // GPU driver can reclaim VRAM immediately (important on mobile).
+      renderer.dispose();
+      renderer.forceContextLoss();
+
+      // Remove the canvas from the DOM
+      if (mount.contains(renderer.domElement)) {
+        mount.removeChild(renderer.domElement);
+      }
+    };
       renderer.dispose();
       renderer.forceContextLoss();
 
@@ -323,19 +424,152 @@ export default function WordCloud3D({ words, onWordClick, isLoading, colorblindM
     hoveredRef.current = null;
     spritesRef.current = [];
 
-    if (!words?.length) return;
+    if (!words?.length) {
+      wordPositionsRef.current = new Map();
+      return;
+    }
 
     const radius = 100;
+    const posMap = new Map();
     const newSprites = words.map((w, i) => {
       const sprite = createWordSprite(w.word, w.weight, isLightMode, colorblindMode);
       const pos    = fibonacciSphere(i, words.length, radius);
       sprite.position.copy(pos);
       sprite.userData.basePos = pos.clone();
+      posMap.set(w.word, pos.clone());
       scene.add(sprite);
       return sprite;
     });
+    wordPositionsRef.current = posMap;
     spritesRef.current = newSprites;
   }, [words, colorblindMode, isLightMode]);
+
+  // ── Build / rebuild 3-D path visualization ───────────────────────────────
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+
+    // ── Clean up previous path objects ──
+    pathObjectsRef.current.forEach(obj => {
+      scene.remove(obj);
+      obj.geometry?.dispose();
+      if (Array.isArray(obj.material)) {
+        obj.material.forEach(m => m.dispose());
+      } else {
+        obj.material?.dispose();
+      }
+    });
+    pathObjectsRef.current = [];
+    pathMarkersRef.current = [];
+
+    if (!showPath || wordPath.length === 0) {
+      prevPathLenRef.current = 0;
+      return;
+    }
+
+    const colorInt = parsePathColor(pathColor);
+
+    // ── Sphere markers at each path node ──────────────────────────────────
+    wordPath.forEach((word, i) => {
+      const pos = wordPositionsRef.current.get(word);
+      if (!pos) return;
+
+      const isLast = i === wordPath.length - 1;
+      const geo = new THREE.SphereGeometry(
+        isLast ? MARKER_RADIUS_LAST : MARKER_RADIUS_DEFAULT,
+        MARKER_GEOMETRY_DETAIL,
+        MARKER_GEOMETRY_DETAIL,
+      );
+      const mat = new THREE.MeshBasicMaterial({
+        color: colorInt,
+        opacity: isLast ? 1.0 : 0.85,
+        transparent: true,
+      });
+      const marker = new THREE.Mesh(geo, mat);
+      marker.position.copy(pos);
+      marker.userData = { word, pathIndex: i };
+      scene.add(marker);
+      pathObjectsRef.current.push(marker);
+      pathMarkersRef.current.push(marker);
+    });
+
+    // ── Path line (needs ≥ 2 control points) ──────────────────────────────
+    const pathPoints = [];
+    for (const word of wordPath) {
+      const pos = wordPositionsRef.current.get(word);
+      if (pos) pathPoints.push(pos.clone());
+    }
+
+    const currLen = pathPoints.length;
+    const prevLen = prevPathLenRef.current;
+    prevPathLenRef.current = currLen;
+
+    if (currLen < 2) return;
+
+    const curve = new THREE.CatmullRomCurve3(pathPoints);
+    const numSegments = Math.max(MIN_CURVE_SEGMENTS, pathPoints.length * SEGMENTS_PER_POINT);
+    const points = curve.getPoints(numSegments);
+
+    // Determine animation start: if one word was just added, continue from
+    // where the previous path ended; otherwise animate from scratch.
+    let startProgress;
+    if (prevLen >= 2 && currLen === prevLen + 1) {
+      startProgress = (prevLen - 1) / (currLen - 1);
+    } else if (prevLen === currLen) {
+      startProgress = 1.0; // words repositioned / settings changed — no animation
+    } else {
+      startProgress = reducedMotion ? 1.0 : 0;
+    }
+
+    let pathMesh;
+
+    if (pathStyle === 'particles') {
+      const geo = new THREE.BufferGeometry().setFromPoints(points);
+      const mat = new THREE.PointsMaterial({
+        color: colorInt,
+        size: 0.5,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: 0.8,
+        depthWrite: false,
+      });
+      geo.setDrawRange(0, Math.max(2, Math.floor(points.length * startProgress)));
+      pathMesh = new THREE.Points(geo, mat);
+
+    } else if (pathStyle === 'tube') {
+      const tubeGeo = new THREE.TubeGeometry(
+        curve, TUBE_TUBULAR_SEGMENTS, TUBE_RADIUS, TUBE_RADIAL_SEGMENTS, false,
+      );
+      const mat = new THREE.MeshBasicMaterial({
+        color: colorInt,
+        opacity: startProgress * TUBE_PATH_OPACITY,
+        transparent: true,
+      });
+      pathMesh = new THREE.Mesh(tubeGeo, mat);
+
+    } else {
+      // Default: line
+      const geo = new THREE.BufferGeometry().setFromPoints(points);
+      const mat = new THREE.LineBasicMaterial({
+        color: colorInt,
+        opacity: 0.6,
+        transparent: true,
+      });
+      geo.setDrawRange(0, Math.max(2, Math.floor(points.length * startProgress)));
+      pathMesh = new THREE.Line(geo, mat);
+    }
+
+    scene.add(pathMesh);
+    pathObjectsRef.current.push(pathMesh);
+
+    // Kick off frame-by-frame animation via pathAnimRef
+    pathAnimRef.current = {
+      progress: startProgress,
+      totalPoints: points.length,
+      pathMesh,
+      style: pathStyle,
+    };
+  }, [wordPath, words, showPath, pathColor, pathStyle, colorblindMode]);
 
   // ── Mouse interaction ─────────────────────────────────────────────────────
   const getIntersects = useCallback((clientX, clientY) => {
@@ -347,16 +581,27 @@ export default function WordCloud3D({ words, onWordClick, isLoading, colorblindM
     const y = -((clientY - rect.top)   / rect.height)  * 2 + 1;
     const rc = raycasterRef.current;
     rc.setFromCamera(new THREE.Vector2(x, y), cam);
+    // Check path markers first; if hit, return immediately so markers take priority
+    const markers = pathMarkersRef.current;
+    if (markers.length > 0) {
+      const markerHits = rc.intersectObjects(markers);
+      if (markerHits.length > 0) return markerHits;
+    }
     return rc.intersectObjects(spritesRef.current);
   }, []);
 
   const handleMouseMove = useCallback((e) => {
     const hits = getIntersects(e.clientX, e.clientY);
     if (hits.length > 0) {
-      hoveredRef.current = hits[0].object;
+      const obj = hits[0].object;
+      const isMarker = obj.userData.pathIndex !== undefined;
+      // Only apply the float-toward-camera hover effect to word sprites
+      hoveredRef.current = isMarker ? null : obj;
       mountRef.current.style.cursor = isLoading ? 'wait' : 'pointer';
       if (tooltipRef.current) {
-        tooltipRef.current.textContent = hits[0].object.userData.word;
+        tooltipRef.current.textContent = isMarker
+          ? `↩ Branch to "${obj.userData.word}"`
+          : obj.userData.word;
         tooltipRef.current.style.left = `${e.clientX}px`;
         tooltipRef.current.style.top  = `${e.clientY - 18}px`;
         tooltipRef.current.style.opacity = '1';
@@ -374,9 +619,15 @@ export default function WordCloud3D({ words, onWordClick, isLoading, colorblindM
     if (isLoading) return;
     const hits = getIntersects(e.clientX, e.clientY);
     if (hits.length > 0) {
-      onWordClick(hits[0].object.userData.word);
+      const obj = hits[0].object;
+      if (obj.userData.pathIndex !== undefined) {
+        // Clicked a path marker — branch the walk from this point
+        onBranchFromPath?.(obj.userData.pathIndex);
+      } else {
+        onWordClick(obj.userData.word);
+      }
     }
-  }, [isLoading, onWordClick, getIntersects]);
+  }, [isLoading, onWordClick, getIntersects, onBranchFromPath]);
 
   return (
     <>
