@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { monitorMemory } from '../utils/memoryMonitor.js';
 
 // ---------------------------------------------------------------------------
 // Path helpers
@@ -168,6 +169,45 @@ function fibonacciSphere(index, total, radius) {
 }
 
 // ---------------------------------------------------------------------------
+// Disposal helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Dispose a material and all of its texture maps.
+ */
+function disposeMaterial(material) {
+  const textureSlots = [
+    'map', 'lightMap', 'bumpMap', 'normalMap', 'specularMap',
+    'envMap', 'alphaMap', 'aoMap', 'displacementMap',
+    'emissiveMap', 'gradientMap', 'metalnessMap', 'roughnessMap',
+  ];
+  textureSlots.forEach(slot => {
+    if (material[slot]) {
+      material[slot].dispose();
+    }
+  });
+  material.dispose();
+}
+
+/**
+ * Traverse a scene/object tree and dispose every geometry and material found.
+ */
+function disposeSceneObjects(root) {
+  root.traverse(object => {
+    if (object.geometry) {
+      object.geometry.dispose();
+    }
+    if (object.material) {
+      if (Array.isArray(object.material)) {
+        object.material.forEach(disposeMaterial);
+      } else {
+        disposeMaterial(object.material);
+      }
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -209,6 +249,12 @@ export default function WordCloud3D({
   // Media queries for user preferences
   const isLightMode    = typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: light)').matches;
   const reducedMotion  = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ── Development memory monitoring ────────────────────────────────────────
+  useEffect(() => {
+    const stopMonitoring = monitorMemory('WordCloud3D');
+    return stopMonitoring;
+  }, []);
 
   // ── Scene bootstrap (runs once) ──────────────────────────────────────────
   useEffect(() => {
@@ -311,7 +357,21 @@ export default function WordCloud3D({
 
     return () => {
       window.removeEventListener('resize', onResize);
+
+      // Cancel animation loop before anything else
       cancelAnimationFrame(rafRef.current);
+}
+    window.addEventListener('resize', onResize);
+
+    return () => {
+      window.removeEventListener('resize', onResize);
+
+      // Cancel animation loop before anything else
+      cancelAnimationFrame(rafRef.current);
+
+      // Dispose OrbitControls
+      controls.dispose();
+
       // Dispose path objects before renderer cleanup
       pathObjectsRef.current.forEach(obj => {
         scene.remove(obj);
@@ -324,7 +384,25 @@ export default function WordCloud3D({
       });
       pathObjectsRef.current = [];
       pathMarkersRef.current = [];
+
+      // Dispose every geometry, material, and texture in the scene
+      disposeSceneObjects(scene);
+      scene.clear();
+
+      // Dispose renderer and force the WebGL context to be released so the
+      // GPU driver can reclaim VRAM immediately (important on mobile).
       renderer.dispose();
+      renderer.forceContextLoss();
+
+      // Remove the canvas from the DOM
+      if (mount.contains(renderer.domElement)) {
+        mount.removeChild(renderer.domElement);
+      }
+    };
+      renderer.dispose();
+      renderer.forceContextLoss();
+
+      // Remove the canvas from the DOM
       if (mount.contains(renderer.domElement)) {
         mount.removeChild(renderer.domElement);
       }
@@ -336,11 +414,12 @@ export default function WordCloud3D({
     const scene = sceneRef.current;
     if (!scene) return;
 
-    // dispose old sprites
+    // Dispose and remove old sprites
     spritesRef.current.forEach(s => {
       scene.remove(s);
-      s.material.map?.dispose();
-      s.material.dispose();
+      if (s.material) {
+        disposeMaterial(s.material);
+      }
     });
     hoveredRef.current = null;
     spritesRef.current = [];
@@ -363,7 +442,7 @@ export default function WordCloud3D({
     });
     wordPositionsRef.current = posMap;
     spritesRef.current = newSprites;
-  }, [words]);
+  }, [words, colorblindMode, isLightMode]);
 
   // ── Build / rebuild 3-D path visualization ───────────────────────────────
   useEffect(() => {
