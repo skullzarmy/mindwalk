@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { monitorMemory } from '../utils/memoryMonitor.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -132,6 +133,45 @@ function fibonacciSphere(index, total, radius) {
 }
 
 // ---------------------------------------------------------------------------
+// Disposal helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Dispose a material and all of its texture maps.
+ */
+function disposeMaterial(material) {
+  const textureSlots = [
+    'map', 'lightMap', 'bumpMap', 'normalMap', 'specularMap',
+    'envMap', 'alphaMap', 'aoMap', 'displacementMap',
+    'emissiveMap', 'gradientMap', 'metalnessMap', 'roughnessMap',
+  ];
+  textureSlots.forEach(slot => {
+    if (material[slot]) {
+      material[slot].dispose();
+    }
+  });
+  material.dispose();
+}
+
+/**
+ * Traverse a scene/object tree and dispose every geometry and material found.
+ */
+function disposeSceneObjects(root) {
+  root.traverse(object => {
+    if (object.geometry) {
+      object.geometry.dispose();
+    }
+    if (object.material) {
+      if (Array.isArray(object.material)) {
+        object.material.forEach(disposeMaterial);
+      } else {
+        disposeMaterial(object.material);
+      }
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -147,9 +187,18 @@ export default function WordCloud3D({ words, onWordClick, isLoading, colorblindM
   const raycasterRef = useRef(new THREE.Raycaster());
   const hoveredRef   = useRef(null);
   const tooltipRef   = useRef(null);
+  // Cache of word sprites keyed by `${word}-${weight}-${theme}-${colorblindMode}`
+  // to avoid recreating identical sprites across word-cloud rebuilds.
+  const spriteCacheRef = useRef(new Map());
   // Media queries for user preferences
   const isLightMode    = typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: light)').matches;
   const reducedMotion  = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ── Development memory monitoring ────────────────────────────────────────
+  useEffect(() => {
+    const stopMonitoring = monitorMemory('WordCloud3D');
+    return stopMonitoring;
+  }, []);
 
   // ── Scene bootstrap (runs once) ──────────────────────────────────────────
   useEffect(() => {
@@ -239,11 +288,34 @@ export default function WordCloud3D({ words, onWordClick, isLoading, colorblindM
 
     return () => {
       window.removeEventListener('resize', onResize);
+
+      // Cancel animation loop before anything else
       cancelAnimationFrame(rafRef.current);
+
+      // Dispose OrbitControls
+      controls.dispose();
+
+      // Dispose every geometry, material, and texture in the scene
+      disposeSceneObjects(scene);
+      scene.clear();
+
+      // Dispose renderer and force the WebGL context to be released so the
+      // GPU driver can reclaim VRAM immediately (important on mobile).
       renderer.dispose();
+      renderer.forceContextLoss();
+
+      // Remove the canvas from the DOM
       if (mount.contains(renderer.domElement)) {
         mount.removeChild(renderer.domElement);
       }
+
+      // Flush the sprite cache so cached GPU resources are also freed
+      spriteCacheRef.current.forEach(sprite => {
+        if (sprite.material) {
+          disposeMaterial(sprite.material);
+        }
+      });
+      spriteCacheRef.current.clear();
     };
   }, []);
 
@@ -252,28 +324,51 @@ export default function WordCloud3D({ words, onWordClick, isLoading, colorblindM
     const scene = sceneRef.current;
     if (!scene) return;
 
-    // dispose old sprites
-    spritesRef.current.forEach(s => {
-      scene.remove(s);
-      s.material.map?.dispose();
-      s.material.dispose();
-    });
+    // Remove old sprites from the scene (do NOT dispose yet – they may stay in cache)
+    spritesRef.current.forEach(s => scene.remove(s));
     hoveredRef.current = null;
     spritesRef.current = [];
 
     if (!words?.length) return;
 
+    const themeKey = isLightMode ? 'light' : 'dark';
+    const cbKey    = colorblindMode ? 'cb' : 'normal';
+    const usedKeys = new Set();
+
     const radius = 100;
     const newSprites = words.map((w, i) => {
-      const sprite = createWordSprite(w.word, w.weight, isLightMode, colorblindMode);
-      const pos    = fibonacciSphere(i, words.length, radius);
+      const cacheKey = `${w.word}-${w.weight}-${themeKey}-${cbKey}`;
+      usedKeys.add(cacheKey);
+
+      let sprite = spriteCacheRef.current.get(cacheKey);
+      if (!sprite) {
+        sprite = createWordSprite(w.word, w.weight, isLightMode, colorblindMode);
+        spriteCacheRef.current.set(cacheKey, sprite);
+      }
+
+      const pos = fibonacciSphere(i, words.length, radius);
       sprite.position.copy(pos);
       sprite.userData.basePos = pos.clone();
+      // phase/floatSpeed/baseScale are visual properties derived from the
+      // word itself, so they are intentionally preserved when reusing a
+      // cached sprite.  Only position-dependent data is updated here.
+      // Reset opacity so the sprite fades in when reused in a new cloud
+      sprite.material.opacity = 0;
       scene.add(sprite);
       return sprite;
     });
     spritesRef.current = newSprites;
-  }, [words]);
+
+    // Evict cached sprites that are no longer in use
+    spriteCacheRef.current.forEach((sprite, key) => {
+      if (!usedKeys.has(key)) {
+        if (sprite.material) {
+          disposeMaterial(sprite.material);
+        }
+        spriteCacheRef.current.delete(key);
+      }
+    });
+  }, [words, colorblindMode, isLightMode]);
 
   // ── Mouse interaction ─────────────────────────────────────────────────────
   const getIntersects = useCallback((clientX, clientY) => {
