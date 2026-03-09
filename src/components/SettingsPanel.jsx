@@ -178,6 +178,19 @@ export default function SettingsPanel({
                 Your key stays in your browser and is used only for direct calls to the AI provider
                 — it is never sent to this server.
               </p>
+              <p className="wizard-oss-blurb">
+                🔓 MindWalk is{' '}
+                <a
+                  href="https://github.com/skullzarmy/mindwalk"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="wizard-oss-link"
+                >
+                  open source
+                </a>
+                . You can run it yourself on a trusted host or locally — your data, your keys, your
+                control.
+              </p>
               <p className="settings-label">STEP 1 — CHOOSE YOUR AI PROVIDER</p>
               <div className="provider-list">
                 {SUPPORTED_PROVIDERS.map(p => (

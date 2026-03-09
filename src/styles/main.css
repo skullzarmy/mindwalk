@@ -780,6 +780,25 @@ html, body, #root {
   background: rgba(192, 132, 252, 0.05);
 }
 
+.wizard-oss-blurb {
+  font-size: 0.82rem;
+  line-height: 1.7;
+  color: var(--text-dim);
+  padding: 10px 14px;
+  border-left: 2px solid var(--cyan);
+  background: rgba(0, 255, 255, 0.04);
+}
+
+.wizard-oss-link {
+  color: var(--cyan);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.wizard-oss-link:hover {
+  color: var(--text);
+}
+
 .wizard-next-btn {
   width: 100%;
   margin-top: 8px;
