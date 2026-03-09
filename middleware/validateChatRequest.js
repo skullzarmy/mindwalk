@@ -17,9 +17,9 @@ const CHARS_PER_TOKEN = 4;
  *  - each entry's content must be a non-empty string ≤ MAX_CONTENT_LENGTH chars
  *
  * Sanitization (Phase 2):
- *  - HTML / script tags stripped
+ *  - angle brackets ('<' and '>') stripped to reduce HTML/script-like markup
  *  - control characters removed
- *  - whitespace normalised
+ *  - tabs collapsed to spaces; newlines preserved; leading/trailing whitespace trimmed
  *  - content capped at 5 000 chars after sanitisation
  *
  * Token budget (Phase 3):
@@ -82,6 +82,14 @@ export function validateChatRequest(req, res, next) {
 
     // Phase 2 – sanitize in place
     msg.content = sanitizeMessage(msg.content);
+
+    // Ensure content is still non-empty after sanitization
+    if (msg.content.length === 0) {
+      return res.status(400).json({
+        error: `Invalid content at index ${i}`,
+        details: 'content must be a non-empty string after sanitization',
+      });
+    }
   }
 
   // Phase 3 – rough token budget check

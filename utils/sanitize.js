@@ -10,7 +10,8 @@ const TRUNCATION_SUFFIX = '... [truncated]';
  *     injection; the content is sent to an AI API, not rendered in a browser,
  *     so angle brackets carry no meaningful semantic value for end users.
  *  2. Remove ASCII control characters except newline (0x0A) and tab (0x09).
- *  3. Normalise runs of whitespace to a single space and trim.
+ *  3. Normalise runs of spaces/tabs to a single space and trim leading/trailing
+ *     whitespace. Newlines are preserved so multi-line messages remain readable.
  *  4. Truncate to MAX_SANITIZED_LENGTH characters.
  *
  * @param {string} content - Raw message content from the client.
