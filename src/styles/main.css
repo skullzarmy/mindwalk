@@ -488,6 +488,20 @@ html, body, #root {
   clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
 }
 
+/* "Get Started" CTA button inside WelcomePanel (shown on mobile BYOK flow) */
+.welcome-get-started-btn {
+  margin-top: auto;
+  width: 100%;
+  padding: 14px;
+  font-size: 0.84rem;
+  letter-spacing: 0.1em;
+  min-height: 48px; /* touch-friendly */
+  animation: pulse-alert 1.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .welcome-get-started-btn { animation: none; }
+}
+
 /* Editor slides from the RIGHT */
 .editor-panel {
   right: 0;

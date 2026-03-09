@@ -153,6 +153,7 @@ export default function SettingsPanel({
       >
         <div className="panel-header">
           <span id={headingId} className="panel-title">🔑 AI SETUP</span>
+          <button onClick={onClose} className="close-btn" aria-label="Skip setup for now">✕</button>
         </div>
 
         {/* Step indicator */}

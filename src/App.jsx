@@ -20,6 +20,9 @@ const DEFAULT_TEMPLATE =
 // Number of past AI responses to blend into the word cloud for a stream-of-thought effect
 const STREAM_DEPTH = 5;
 
+// Media query that matches the same mobile breakpoint used in main.css
+const MOBILE_MQ = '(max-width: 768px)';
+
 // Initial decorative words shown before the first AI response
 const SEED_WORDS = [
   { word: 'consciousness', weight: 1.0  },
@@ -111,7 +114,12 @@ export default function App() {
           if (serverByokOnly && !hasUserKey()) {
             setWizardMode(true);
             setShowWelcome(true);
-            setActivePanel('settings');
+            // On desktop open the wizard panel immediately alongside the welcome panel.
+            // On mobile the panels overlap (both are 100 vw), so show the welcome
+            // message first and let the user tap "Get Started" to open the wizard.
+            if (!window.matchMedia(MOBILE_MQ).matches) {
+              setActivePanel('settings');
+            }
           }
         })
         .catch(() => {
@@ -119,7 +127,9 @@ export default function App() {
             setByokOnly(true);
             setWizardMode(true);
             setShowWelcome(true);
-            setActivePanel('settings');
+            if (!window.matchMedia(MOBILE_MQ).matches) {
+              setActivePanel('settings');
+            }
           }
         });
     }
@@ -167,7 +177,9 @@ export default function App() {
         if (serverByokOnly && !hasUserKey()) {
           setWizardMode(true);
           setShowWelcome(true);
-          setActivePanel('settings');
+          if (!window.matchMedia(MOBILE_MQ).matches) {
+            setActivePanel('settings');
+          }
         }
       })
       .catch(() => {
@@ -175,7 +187,9 @@ export default function App() {
           setByokOnly(true);
           setWizardMode(true);
           setShowWelcome(true);
-          setActivePanel('settings');
+          if (!window.matchMedia(MOBILE_MQ).matches) {
+            setActivePanel('settings');
+          }
         }
       });
   }, []);
@@ -376,6 +390,9 @@ export default function App() {
     reader.readAsText(file);
   }, [handleRestoreWalk]);
 
+  // True when the server has no key and the user hasn't configured one yet
+  const requiresBYOKSetup = byokOnly && !hasUserKey();
+
   return (
     <div className={`app${colorblindMode ? ' colorblind-mode' : ''}`}>
       {/* Skip navigation link (WCAG 2.4.1) */}
@@ -479,7 +496,7 @@ export default function App() {
             🗺 <span className="btn-label">JOURNEY</span>
           </button>
           <button
-            className={`hud-btn${activePanel === 'settings' ? ' active' : ''}${byokOnly && !hasUserKey() ? ' hud-btn-alert' : ''}`}
+            className={`hud-btn${activePanel === 'settings' ? ' active' : ''}${requiresBYOKSetup ? ' hud-btn-alert' : ''}`}
             onClick={() => { setWizardMode(false); togglePanel('settings'); }}
             aria-expanded={activePanel === 'settings'}
             aria-controls="settings-panel"
@@ -570,6 +587,11 @@ export default function App() {
       <WelcomePanel
         isOpen={showWelcome}
         onClose={() => setShowWelcome(false)}
+        byokRequired={requiresBYOKSetup}
+        onGetStarted={() => {
+          setShowWelcome(false);
+          setActivePanel('settings');
+        }}
       />
       <ChatPanel
         messages={messages}
