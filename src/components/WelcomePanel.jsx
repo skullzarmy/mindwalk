@@ -1,4 +1,4 @@
-export default function WelcomePanel({ isOpen, onClose }) {
+export default function WelcomePanel({ isOpen, onClose, byokRequired = false, onGetStarted }) {
   const headingId = 'welcome-panel-title';
 
   return (
@@ -40,9 +40,15 @@ export default function WelcomePanel({ isOpen, onClose }) {
           </ul>
         </div>
 
-        <p className="welcome-cta">
-          To get started, connect your AI provider using the panel on the right →
-        </p>
+        {byokRequired && onGetStarted ? (
+          <button className="save-btn welcome-get-started-btn" onClick={onGetStarted}>
+            GET STARTED — CONNECT YOUR AI →
+          </button>
+        ) : (
+          <p className="welcome-cta">
+            To get started, connect your AI provider using the panel on the right →
+          </p>
+        )}
       </div>
     </div>
   );
