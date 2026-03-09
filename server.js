@@ -269,6 +269,20 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
 
 // ── Rate limiters (Phase 1 + 2 + 3) ──────────────────────────────────────────
 
+// In Netlify's serverless context, serverless-http wraps invocations without a
+// real TCP socket, so Express cannot populate req.ip even with 'trust proxy'
+// set. Read through Netlify's own client-IP header, then the standard
+// X-Forwarded-For, and fall back to 'unknown' as a safe sentinel so that
+// express-rate-limit never receives undefined.
+function resolveClientIp(req) {
+  return (
+    req.ip ??
+    req.headers['x-nf-client-connection-ip'] ??
+    req.headers['x-forwarded-for']?.split(',')[0].trim() ??
+    'unknown'
+  );
+}
+
 // Shared handler factory: computes the actual time remaining in the current
 // window from req.rateLimit.resetTime so the JSON retryAfter is accurate even
 // when a client hits the limit near the end of a window.
@@ -296,6 +310,7 @@ const configLimiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: resolveClientIp,
   handler: buildRateLimitHandler('Too many requests. Try again shortly.'),
 });
 
@@ -306,6 +321,7 @@ const serverKeyLimiter = rateLimit({
   max: 20,                   // strict: 20 req / 15 min (server pays)
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: resolveClientIp,
   handler: buildRateLimitHandler('MindWalk limits requests to prevent abuse. Try again shortly.'),
 });
 
@@ -314,6 +330,7 @@ const byokLimiter = rateLimit({
   max: 50,                   // looser: 50 req / 15 min (client pays)
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: resolveClientIp,
   handler: buildRateLimitHandler('MindWalk limits requests to prevent abuse. Try again shortly.'),
 });
 
@@ -345,7 +362,7 @@ app.post('/api/chat', adaptiveChatLimiter, validateChatRequest, async (req, res)
   // Phase 4: token quota check before hitting the AI provider
   const estimatedTokens = estimateTokens(messages);
   try {
-    checkTokenQuota(req.ip, estimatedTokens);
+    checkTokenQuota(resolveClientIp(req), estimatedTokens);
   } catch (err) {
     res.setHeader('Retry-After', err.retryAfter);
     const retryMin = Math.floor(err.retryAfter / 60);
@@ -390,7 +407,7 @@ app.post('/api/synthesize', adaptiveChatLimiter, async (req, res) => {
   // Synthesis is heavier, costs more tokens, track accordingly
   const estimatedTokens = 400; 
   try {
-    checkTokenQuota(req.ip, estimatedTokens);
+    checkTokenQuota(resolveClientIp(req), estimatedTokens);
   } catch (err) {
     res.setHeader('Retry-After', err.retryAfter);
     const retryMin = Math.floor(err.retryAfter / 60);
@@ -502,6 +519,7 @@ const staticLimiter = rateLimit({
   max: 200,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: resolveClientIp,
 });
 
 // Avoid launching an independent port listener when running as a Netlify serverless function
