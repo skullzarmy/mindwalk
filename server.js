@@ -502,12 +502,18 @@ const staticLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-if (process.env.NODE_ENV === 'production') {
-  app.get('*', staticLimiter, (_req, res) => {
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+// Avoid launching an independent port listener when running as a Netlify serverless function
+if (!process.env.NETLIFY) {
+  if (process.env.NODE_ENV === 'production') {
+    app.get('*', staticLimiter, (_req, res) => {
+      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    });
+  }
+
+  app.listen(PORT, () => {
+    console.log(`\n🧠 MindWalk server → http://localhost:${PORT}\n`);
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`\n🧠 MindWalk server → http://localhost:${PORT}\n`);
-});
+// Export the Express app so serverless-http can wrap it into a Lambda execution context
+export { app };
