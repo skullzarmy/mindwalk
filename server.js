@@ -189,14 +189,134 @@ app.use((req, res, next) => {
 app.use(cors({ origin: ['http://localhost:5173', `http://localhost:${PORT}`] }));
 app.use(express.json());
 
-// Rate limit the chat API to prevent runaway AI spend
-const chatLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 30,             // max 30 requests per window per IP
+// ── Token quota tracking (Phase 4) ───────────────────────────────────────────
+// Tracks per-IP estimated token spend; resets each hour.
+// Uses a conservative 4-chars-per-token heuristic (no tiktoken dependency).
+const DEFAULT_TOKEN_QUOTA_PER_HOUR = 10000;
+const parsedTokenQuota = parseInt(process.env.TOKEN_QUOTA_PER_HOUR, 10);
+const TOKEN_QUOTA_PER_HOUR =
+  Number.isFinite(parsedTokenQuota) && parsedTokenQuota > 0
+    ? parsedTokenQuota
+    : DEFAULT_TOKEN_QUOTA_PER_HOUR;
+const TOKEN_WINDOW_MS      = 60 * 60 * 1000; // 1 hour
+const tokenUsage           = new Map(); // ip → { tokens: number, resetAt: timestamp }
+
+function estimateTokens(messages) {
+  // ~4 chars ≈ 1 token for message content, plus a small per-message overhead
+  // for role/metadata fields in the JSON envelope (≈4 tokens each).
+  const contentChars = messages.map(m => m.content || '').join(' ').length;
+  return Math.ceil(contentChars / 4) + messages.length * 4;
+}
+
+function checkTokenQuota(ip, tokensRequested) {
+  const now   = Date.now();
+  const quota = tokenUsage.get(ip) || { tokens: 0, resetAt: now + TOKEN_WINDOW_MS };
+
+  if (now > quota.resetAt) {
+    quota.tokens  = 0;
+    quota.resetAt = now + TOKEN_WINDOW_MS;
+  }
+
+  if (quota.tokens + tokensRequested > TOKEN_QUOTA_PER_HOUR) {
+    const retryAfterSec = Math.ceil((quota.resetAt - now) / 1000);
+    const err = new Error('Token quota exceeded');
+    err.retryAfter = retryAfterSec;
+    throw err;
+  }
+
+  // This function now only checks quota and updates the window metadata.
+  // Actual token consumption should be recorded via commitTokenUsage(...)
+  tokenUsage.set(ip, quota);
+}
+
+function commitTokenUsage(ip, tokensUsed) {
+  const now   = Date.now();
+  const quota = tokenUsage.get(ip) || { tokens: 0, resetAt: now + TOKEN_WINDOW_MS };
+
+  if (now > quota.resetAt) {
+    quota.tokens  = 0;
+    quota.resetAt = now + TOKEN_WINDOW_MS;
+  }
+
+  quota.tokens += tokensUsed;
+  tokenUsage.set(ip, quota);
+}
+// Periodically prune stale entries to prevent unbounded memory growth.
+// Run every 15 minutes so cleanup work is spread out rather than batched hourly.
+const tokenCleanupInterval = setInterval(() => {
+  const now = Date.now();
+  for (const [ip, quota] of tokenUsage.entries()) {
+    if (now > quota.resetAt) tokenUsage.delete(ip);
+  }
+}, 15 * 60 * 1000);
+
+// Allow graceful shutdown — clear the interval so the process can exit cleanly.
+// Allow graceful shutdown — clear the interval when the process receives a
+// shutdown signal. Actual process exit and HTTP server shutdown should be
+// handled elsewhere.
+for (const signal of ['SIGTERM', 'SIGINT']) {
+  process.once(signal, () => {
+    clearInterval(tokenCleanupInterval);
+  });
+}
+
+// ── Rate limiters (Phase 1 + 2 + 3) ──────────────────────────────────────────
+
+// Shared handler factory: computes the actual time remaining in the current
+// window from req.rateLimit.resetTime so the JSON retryAfter is accurate even
+// when a client hits the limit near the end of a window.
+function buildRateLimitHandler(hint) {
+  return (req, res) => {
+    const resetTime  = req.rateLimit?.resetTime;
+    const secondsLeft = resetTime
+      ? Math.max(0, Math.ceil((resetTime.getTime() - Date.now()) / 1000))
+      : 15 * 60;
+    const retryMin = Math.floor(secondsLeft / 60);
+    const retryMsg = secondsLeft >= 60
+      ? `${retryMin} minute(s)`
+      : `${secondsLeft} second(s)`;
+    res.status(429).json({
+      error:      'Rate limit exceeded',
+      retryAfter: retryMsg,
+      hint,
+    });
+  };
+}
+
+// Phase 2: permissive limiter for non-AI endpoints (config, static)
+const configLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many requests. Please slow down.' },
+  handler: buildRateLimitHandler('Too many requests. Try again shortly.'),
 });
+
+// Phase 3: adaptive limiter — stricter when the server's own API key is used,
+// looser when the client is spending its own credits (BYOK).
+const serverKeyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,                   // strict: 20 req / 15 min (server pays)
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: buildRateLimitHandler('MindWalk limits requests to prevent abuse. Try again shortly.'),
+});
+
+const byokLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50,                   // looser: 50 req / 15 min (client pays)
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: buildRateLimitHandler('MindWalk limits requests to prevent abuse. Try again shortly.'),
+});
+
+// Phase 1 / Phase 3: apply the rate limiter.
+// NOTE: BYOK proxying is not implemented yet, and /api/chat always uses the
+// server-side API key. To avoid clients bypassing the stricter server-key
+// limit via an untrusted header, always apply the serverKeyLimiter here.
+function adaptiveChatLimiter(req, res, next) {
+  return serverKeyLimiter(req, res, next);
+}
 
 // Serve built frontend in production
 if (process.env.NODE_ENV === 'production') {
@@ -205,15 +325,32 @@ if (process.env.NODE_ENV === 'production') {
 
 // Tells the client whether a server-side AI key is available so it knows
 // whether to enter BYOK-only mode or can fall back to the server proxy.
-app.get('/api/config', (_req, res) => {
+app.get('/api/config', configLimiter, (_req, res) => {
   const provider = selectProvider();
   const cfg      = PROVIDER_DEFAULTS[provider];
   const hasKey   = !isPlaceholder(process.env[cfg.keyVar]);
   res.json({ byokOnly: !hasKey, serverProvider: hasKey ? provider : null });
 });
 
-app.post('/api/chat', chatLimiter, validateChatRequest, async (req, res) => {
+app.post('/api/chat', adaptiveChatLimiter, validateChatRequest, async (req, res) => {
   const { messages } = req.body;
+
+  // Phase 4: token quota check before hitting the AI provider
+  const estimatedTokens = estimateTokens(messages);
+  try {
+    checkTokenQuota(req.ip, estimatedTokens);
+  } catch (err) {
+    res.setHeader('Retry-After', err.retryAfter);
+    const retryMin = Math.floor(err.retryAfter / 60);
+    const retryMsg = err.retryAfter >= 60
+      ? `${retryMin} minute(s)`
+      : `${err.retryAfter} second(s)`;
+    return res.status(429).json({
+      error:      'Token quota exceeded',
+      retryAfter: retryMsg,
+      hint:       `You have used your hourly token budget. Try again in about ${retryMsg}.`,
+    });
+  }
 
   const provider = selectProvider();
   const cfg = PROVIDER_DEFAULTS[provider];
