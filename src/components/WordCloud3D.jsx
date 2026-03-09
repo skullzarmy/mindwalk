@@ -360,14 +360,6 @@ export default function WordCloud3D({
 
       // Cancel animation loop before anything else
       cancelAnimationFrame(rafRef.current);
-}
-    window.addEventListener('resize', onResize);
-
-    return () => {
-      window.removeEventListener('resize', onResize);
-
-      // Cancel animation loop before anything else
-      cancelAnimationFrame(rafRef.current);
 
       // Dispose OrbitControls
       controls.dispose();
@@ -391,14 +383,6 @@ export default function WordCloud3D({
 
       // Dispose renderer and force the WebGL context to be released so the
       // GPU driver can reclaim VRAM immediately (important on mobile).
-      renderer.dispose();
-      renderer.forceContextLoss();
-
-      // Remove the canvas from the DOM
-      if (mount.contains(renderer.domElement)) {
-        mount.removeChild(renderer.domElement);
-      }
-    };
       renderer.dispose();
       renderer.forceContextLoss();
 
