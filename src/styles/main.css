@@ -181,6 +181,7 @@ html, body, #root {
   font-family: var(--font);
   border-radius: 3px;
   transition: opacity 0.15s, text-shadow 0.15s;
+  pointer-events: auto;
 }
 .hud-title-btn:hover {
   opacity: 0.85;
