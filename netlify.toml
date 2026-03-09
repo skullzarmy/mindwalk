@@ -3,6 +3,9 @@
   publish = "dist"
   functions = "netlify/functions"
 
+[functions]
+  included_files = ["server/fonts/**"]
+
 # Proxy all /api traffic to our Serverless wrapped Express backend
 [[redirects]]
   from = "/api/*"

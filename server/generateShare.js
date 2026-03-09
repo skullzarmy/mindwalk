@@ -10,10 +10,12 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Pre-load proven .woff fonts directly from node_modules for 1:1 parity without corrupted downloads
-const interRegular = fs.readFileSync(path.join(__dirname, '..', 'node_modules', '@fontsource', 'inter', 'files', 'inter-latin-400-normal.woff'));
-const interBold = fs.readFileSync(path.join(__dirname, '..', 'node_modules', '@fontsource', 'inter', 'files', 'inter-latin-700-normal.woff'));
-const shareTechMono = fs.readFileSync(path.join(__dirname, '..', 'node_modules', '@fontsource', 'share-tech-mono', 'files', 'share-tech-mono-latin-400-normal.woff'));
+// Use process.cwd() instead of __dirname to securely load static assets inside
+// Netlify Lambda functions, because esbuild flattens the directory tree during bundling.
+const fontDir = path.join(process.cwd(), 'server', 'fonts');
+const interRegular = fs.readFileSync(path.join(fontDir, 'inter-regular.ttf'));
+const interBold = fs.readFileSync(path.join(fontDir, 'inter-bold.ttf'));
+const shareTechMono = fs.readFileSync(path.join(fontDir, 'share-tech-mono.ttf'));
 
 /**
  * Generates an SVG string using Satori and exact HTML styling constraints,
