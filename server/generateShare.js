@@ -7,9 +7,6 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 // Use process.cwd() instead of __dirname to securely load static assets inside
 // Netlify Lambda functions, because esbuild flattens the directory tree during bundling.
 const fontDir = path.join(process.cwd(), 'server', 'fonts');
