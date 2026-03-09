@@ -3,13 +3,15 @@ import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { z } from 'zod';
 import { getStore } from '@netlify/blobs';
 import { validateChatRequest } from './middleware/validateChatRequest.js';
 import { generateAndStoreShareImage } from './server/generateShare.js';
 
-const SERVER_DIR = path.dirname(fileURLToPath(import.meta.url));
+// Use process.cwd() instead of fileURLToPath(import.meta.url) so this module
+// works in both native ESM and esbuild CJS bundles (Netlify Functions).
+// import.meta.url is undefined in CJS context and would crash at module load.
+const SERVER_DIR = process.cwd();
 const app = express();
 // Trust the first proxy hop (Vite or Netlify) so rate limiter reads X-Forwarded-For properly
 app.set('trust proxy', 1);
