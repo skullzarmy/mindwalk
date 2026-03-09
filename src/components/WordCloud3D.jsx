@@ -229,6 +229,7 @@ export default function WordCloud3D({
     words,
     onWordClick,
     isLoading,
+    isSynthesizing = false,
     colorblindMode = false,
     wordPath = [],
     showPath = true,
@@ -280,7 +281,8 @@ export default function WordCloud3D({
         const fogColor = isLightMode ? 0xeef2f7 : 0x050510;
 
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(bgColor);
+        // Remove solid background color so the canvas itself is transparent for the compositor
+        // scene.background = new THREE.Color(bgColor); 
         scene.fog = new THREE.FogExp2(fogColor, 0.0012);
         sceneRef.current = scene;
 
@@ -288,7 +290,8 @@ export default function WordCloud3D({
         camera.position.set(0, 0, 220);
         cameraRef.current = camera;
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        // alpha: true allows the canvas to be composited over the dark background in SynthesisOverlay
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
         renderer.setSize(mount.clientWidth, mount.clientHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         mount.appendChild(renderer.domElement);
@@ -314,11 +317,12 @@ export default function WordCloud3D({
 
             const cam = cameraRef.current;
             spritesRef.current.forEach((sprite) => {
-                const { phase, floatSpeed, baseScale, basePos } = sprite.userData;
+                const { phase, floatSpeed, baseScale, basePos, targetOpacity = 1 } = sprite.userData;
 
-                // fade in
-                if (sprite.material.opacity < 1) {
-                    sprite.material.opacity = Math.min(1, sprite.material.opacity + 0.025);
+                // smooth opacity transitions
+                const currentOpac = sprite.material.opacity;
+                if (Math.abs(currentOpac - targetOpacity) > 0.01) {
+                    sprite.material.opacity += (targetOpacity - currentOpac) * 0.05;
                 }
 
                 const floatY = Math.sin(t * floatSpeed + phase) * 1.5;
@@ -440,6 +444,86 @@ export default function WordCloud3D({
         wordPositionsRef.current = posMap;
         spritesRef.current = newSprites;
     }, [words, colorblindMode, isLightMode]);
+
+    // ── Apply Synthesis Visual State & Constellation ─────────────────────────
+    const constellationWebRef = useRef(null);
+
+    useEffect(() => {
+        const scene = sceneRef.current;
+        if (!controlsRef.current || !scene) return;
+        
+        // Slow down rotation during synthesis for a majestic feel
+        controlsRef.current.autoRotateSpeed = isSynthesizing ? 0.03 : 0.4;
+
+        // Hide all 3D text words completely during synthesis so only the geometric constellation remains
+        spritesRef.current.forEach((sprite) => {
+            sprite.userData.targetOpacity = isSynthesizing ? 0.0 : 1.0;
+        });
+
+        // Highlight marker nodes
+        pathMarkersRef.current.forEach(marker => {
+            if (isSynthesizing) {
+                marker.material.color.setHex(0xffffff);
+                marker.scale.set(1.5, 1.5, 1.5);
+            } else {
+                marker.material.color.setHex(parsePathColor(pathColor));
+                marker.scale.set(1, 1, 1);
+            }
+        });
+
+        // Add a striking geometric constellation web connecting path nodes
+        if (isSynthesizing && wordPath.length > 1) {
+            if (!constellationWebRef.current) {
+                const pathNodes = wordPath.map(w => wordPositionsRef.current.get(w)).filter(Boolean);
+                
+                const points = [];
+                // Connect all path nodes to each other to form a complete structural envelope
+                for (let i = 0; i < pathNodes.length; i++) {
+                    for (let j = i + 1; j < pathNodes.length; j++) {
+                        points.push(pathNodes[i]);
+                        points.push(pathNodes[j]);
+                    }
+                }
+
+                // Add glowing interconnected lines
+                const geo = new THREE.BufferGeometry().setFromPoints(points);
+                const mat = new THREE.LineBasicMaterial({
+                    color: 0x00ffff,
+                    transparent: true,
+                    opacity: 0.85, 
+                    blending: THREE.AdditiveBlending
+                });
+                const webMesh = new THREE.LineSegments(geo, mat);
+
+                // Add glowing dust points at the vertices
+                const pointsMat = new THREE.PointsMaterial({
+                    color: 0xffffff,
+                    size: 3,
+                    transparent: true,
+                    opacity: 0.9,
+                    blending: THREE.AdditiveBlending
+                });
+                const dustMesh = new THREE.Points(geo, pointsMat);
+                
+                const group = new THREE.Group();
+                group.add(webMesh);
+                group.add(dustMesh);
+
+                scene.add(group);
+                constellationWebRef.current = group;
+            }
+        } else {
+            if (constellationWebRef.current) {
+                scene.remove(constellationWebRef.current);
+                // Dispose children
+                constellationWebRef.current.children.forEach(child => {
+                    child.geometry.dispose();
+                    child.material.dispose();
+                });
+                constellationWebRef.current = null;
+            }
+        }
+    }, [isSynthesizing, wordPath, pathColor]);
 
     // ── Build / rebuild 3-D path visualization ───────────────────────────────
     useEffect(() => {

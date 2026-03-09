@@ -3,11 +3,13 @@ import WordCloud3D   from './components/WordCloud3D.jsx';
 import ChatPanel     from './components/ChatPanel.jsx';
 import JourneyPanel  from './components/JourneyPanel.jsx';
 import SettingsPanel from './components/SettingsPanel.jsx';
+import JourneyTracker from './components/JourneyTracker.jsx';
+import SynthesisOverlay from './components/SynthesisOverlay.jsx';
 import { extractWords } from './utils/textProcessing.js';
 
 import { hasUserKey, setApiKey, consumeLegacyKey } from './utils/aiSettings.js';
 import { hasEncryptedKey, loadEncryptedKey, getSessionKey, saveSessionKey } from './utils/secureStorage.js';
-import { callAIClient } from './utils/aiClient.js';
+import { callAIClient, callSynthesisClient } from './utils/aiClient.js';
 import { saveWalk, exportWalk, parseImportedWalk } from './utils/walkStorage.js';
 import './styles/main.css';
 
@@ -51,6 +53,11 @@ export default function App() {
   const [pathStyle,       setPathStyle]       = useState('line');
   const [byokOnly,        setByokOnly]        = useState(false);
   const [wizardMode,      setWizardMode]      = useState(false);
+  
+  // Synthesis state
+  const [isSynthesizing,  setIsSynthesizing]  = useState(false);
+  const [synthesisResult, setSynthesisResult] = useState(null);
+
   // Passphrase unlock modal — shown when an encrypted key exists but has not yet
   // been decrypted for this session.
   const [showPassphrasePrompt, setShowPassphrasePrompt] = useState(false);
@@ -211,13 +218,54 @@ export default function App() {
     }
   }, []);
 
+  // ── Core Synthesis call ───────────────────────────────────────────────────
+  const startSynthesis = useCallback(async (path) => {
+    if (path.length === 0) return;
+    setIsSynthesizing(true);
+    setError(null);
+
+    try {
+      let result;
+      if (hasUserKey()) {
+        result = await callSynthesisClient(path);
+      } else {
+        const res = await fetch('/api/synthesize', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ wordPath: path }),
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'API request failed');
+        result = data;
+      }
+      setSynthesisResult(result);
+    } catch (err) {
+      setError(err.message);
+      setIsSynthesizing(false);
+    }
+  }, []);
+
   // ── Word-click handler ────────────────────────────────────────────────────
   const handleWordClick = useCallback((word) => {
+    // If we're already viewing a result, clear it to continue
+    if (synthesisResult) {
+      setSynthesisResult(null);
+      setIsSynthesizing(false);
+    }
+
     const newPath = [...wordPathRef.current, word];
     wordPathRef.current = newPath;
     setWordPath(newPath);
 
     const pathStr = newPath.join(' → ');
+    setLastWord(word);
+
+    // EXACTLY 10 WORDS: Auto-trigger synthesis
+    if (newPath.length === 10) {
+      startSynthesis(newPath);
+      return;
+    }
+
     let prompt = promptTemplate.replace('{WORD}', word);
 
     if (prompt.includes('{PATH}')) {
@@ -227,9 +275,14 @@ export default function App() {
       prompt += `\n\n[Mind walk journey: ${pathStr}]`;
     }
 
-    setLastWord(word);
     sendMessage(prompt);
-  }, [promptTemplate, sendMessage]);
+  }, [promptTemplate, sendMessage, synthesisResult, startSynthesis]);
+
+  const handleSynthesizeEarly = useCallback(() => {
+    if (wordPathRef.current.length >= 5) {
+      startSynthesis(wordPathRef.current);
+    }
+  }, [startSynthesis]);
 
   // ── Form submit ───────────────────────────────────────────────────────────
   const handleSubmit = (e) => {
@@ -256,6 +309,8 @@ export default function App() {
     setWordPath([]);
     setLastWord(null);
     setError(null);
+    setSynthesisResult(null);
+    setIsSynthesizing(false);
   }, []);
 
   /** Branch the walk from an earlier path index (Phase 3 interactive path) */
@@ -360,7 +415,8 @@ export default function App() {
       <WordCloud3D
         words={words}
         onWordClick={handleWordClick}
-        isLoading={isLoading}
+        isLoading={isLoading || isSynthesizing}
+        isSynthesizing={!!synthesisResult || isSynthesizing}
         colorblindMode={colorblindMode}
         wordPath={wordPath}
         showPath={showPath}
@@ -381,6 +437,16 @@ export default function App() {
           <span className="hud-icon" aria-hidden="true">🧠</span>
           <span className="hud-title-text">MINDWALK</span>
         </div>
+        
+        {wordPath.length > 0 && (
+          <JourneyTracker 
+            wordPath={wordPath} 
+            maxWords={10} 
+            onSynthesizeEarly={handleSynthesizeEarly}
+            isLoading={isSynthesizing}
+          />
+        )}
+
         <nav className="hud-controls" aria-label="Application controls">
           <button
             className={`hud-btn ${activePanel === 'chat' ? 'active' : ''}`}
@@ -427,13 +493,25 @@ export default function App() {
       )}
 
       {/* ── Loading indicator ── */}
-      {isLoading && (
+      {(isLoading || isSynthesizing) && !synthesisResult && (
         <div className="loading-overlay" aria-live="polite">
           <div className="loading-ring" />
           <span>
-            {lastWord ? `Pondering "${lastWord}"…` : 'Thinking…'}
+            {isSynthesizing ? 'Weaving your journey…' : lastWord ? `Pondering "${lastWord}"…` : 'Thinking…'}
           </span>
         </div>
+      )}
+
+      {/* ── Final Synthesis Overlay ── */}
+      {synthesisResult && (
+        <SynthesisOverlay 
+          result={synthesisResult} 
+          wordPath={wordPath}
+          onContinue={() => {
+            setSynthesisResult(null);
+            setIsSynthesizing(false);
+          }}
+        />
       )}
 
       {/* ── Error banner ── */}

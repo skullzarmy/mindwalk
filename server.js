@@ -4,10 +4,15 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { z } from 'zod';
+import { getStore } from '@netlify/blobs';
 import { validateChatRequest } from './middleware/validateChatRequest.js';
+import { generateAndStoreShareImage } from './server/generateShare.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+// Trust the first proxy hop (Vite or Netlify) so rate limiter reads X-Forwarded-For properly
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3001;
 
 // ── AI Provider Configuration ─────────────────────────────────────────────────
@@ -370,6 +375,122 @@ app.post('/api/chat', adaptiveChatLimiter, validateChatRequest, async (req, res)
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Journey Synthesis (Phase 5) ──────────────────────────────────────────────
+app.post('/api/synthesize', adaptiveChatLimiter, async (req, res) => {
+  const { wordPath } = req.body;
+  if (!Array.isArray(wordPath) || wordPath.length === 0) {
+    return res.status(400).json({ error: 'wordPath array is required' });
+  }
+
+  // Synthesis is heavier, costs more tokens, track accordingly
+  const estimatedTokens = 400; 
+  try {
+    checkTokenQuota(req.ip, estimatedTokens);
+  } catch (err) {
+    res.setHeader('Retry-After', err.retryAfter);
+    const retryMin = Math.floor(err.retryAfter / 60);
+    const retryMsg = err.retryAfter >= 60 ? `${retryMin} minute(s)` : `${err.retryAfter} second(s)`;
+    return res.status(429).json({
+      error: 'Token quota exceeded',
+      retryAfter: retryMsg,
+      hint: `You have used your hourly token budget. Try again in about ${retryMsg}.`,
+    });
+  }
+
+  const provider = selectProvider();
+  const cfg = PROVIDER_DEFAULTS[provider];
+  const apiKey = process.env[cfg.keyVar];
+
+  if (isPlaceholder(apiKey)) {
+    return res.status(500).json({
+      error: `No AI API key configured. Set ${cfg.keyVar} in your .env file.`,
+    });
+  }
+
+  const systemPrompt = `You are "The Weaver", observing a user's mind walk journey.
+The user has pondered a series of interconnected concepts: [${wordPath.join(' → ')}].
+
+Analyze this chronological evolution of thoughts. What is the overarching narrative of this journey? How did their perspective shift from the first word to the last? What is the hidden philosophical relationship between these concepts?
+
+You MUST respond in EXACTLY the following format, with no extra text or markdown:
+
+CONSTELLATION: <A striking, beautiful 2-4 word name for this specific pattern of thoughts, like "The Constellation of Anxious Clarity" or "The Architecture of Patience">
+MESSAGE: <1 punchy, profound sentence about how these concepts connect. Under 150 characters MAX so it fits in a single Tweet easily.>`;
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: `Please synthesize my mind walk journey: [${wordPath.join(' → ')}]` }
+  ];
+
+  try {
+    // Give it a bit more room to think and output
+    const data = await callAI(provider, messages, 300);
+    const content = data.choices[0].message.content;
+
+    let constellation = "The Unknown Constellation";
+    let message = "A journey without a clear destination reveals its own path.";
+
+    const constMatch = content.match(/CONSTELLATION:\s*(.+)/i);
+    const msgMatch = content.match(/MESSAGE:\s*([\s\S]+)/i);
+
+    if (constMatch) constellation = constMatch[1].trim();
+    if (msgMatch) message = msgMatch[1].trim();
+
+    res.json({ constellation, message });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Secure Share Image Generation (Phase 5 Blob Architecture) ───────────────
+const shareSchema = z.object({
+  constellationName: z.string().trim().min(1).max(100),
+  message: z.string().trim().min(1).max(300),
+  wordPath: z.array(z.string().trim().max(50)).min(1).max(20),
+  format: z.enum(['portrait', 'landscape']).default('portrait')
+});
+
+app.post('/api/generate-share', adaptiveChatLimiter, async (req, res) => {
+  try {
+    // 1. Strict validation to prevent XSS, massive payload DoS, or SVG injection
+    const validated = shareSchema.parse(req.body);
+    
+    // 2. Generate securely via Satori/Resvg
+    const imageUrlOrBase64 = await generateAndStoreShareImage(
+      validated.constellationName,
+      validated.wordPath,
+      validated.message,
+      validated.format
+    );
+    
+    res.json({ url: imageUrlOrBase64 });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid share payload properties', details: error.errors });
+    }
+    console.error("Generator Error:", error);
+    res.status(500).json({ error: 'Failed to generate share image' });
+  }
+});
+
+app.get('/api/blob/:key', async (req, res) => {
+  try {
+    const siteId = process.env.NETLIFY_SITE_ID || 'local-dev-fallback';
+    const blobsAuth = process.env.NETLIFY_BLOBS_TOKEN;
+    if (!blobsAuth) return res.status(404).send('Blobs not configured locally');
+    
+    const store = getStore({ name: 'mindwalk-shares', siteID: siteId, token: blobsAuth });
+    const blob = await store.get(req.params.key, { type: 'stream' });
+    if (!blob) return res.status(404).send('Not found');
+
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    blob.pipe(res);
+  } catch (err) {
+    res.status(500).send('Error retrieving blob');
   }
 });
 

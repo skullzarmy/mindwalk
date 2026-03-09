@@ -122,3 +122,65 @@ export async function callAIClient(messages) {
       return callOpenAICompatible(baseUrl, apiKey, resolvedModel, messages, resolvedMax);
   }
 }
+
+// ── Synthesis dispatcher (Phase 5) ─────────────────────────────────────────
+export async function callSynthesisClient(wordPath) {
+  const { provider, model } = getSettings();
+  const apiKey        = getApiKey();
+  const baseUrl       = PROVIDER_URLS[provider];
+  const resolvedModel = model || { openai: 'gpt-3.5-turbo', anthropic: 'claude-haiku-4-5', google: 'gemini-1.5-flash', xai: 'grok-3-mini', openrouter: 'openai/gpt-3.5-turbo', 'cloudflare-workers': '@cf/meta/llama-3.1-8b-instruct', cloudflare: '@cf/meta/llama-3.1-8b-instruct' }[provider] || 'gpt-3.5-turbo';
+  const resolvedMax   = 300; // Need more tokens for synthesis
+
+  const systemPrompt = `You are "The Weaver", observing a user's mind walk journey.
+The user has pondered a series of interconnected concepts: [${wordPath.join(' → ')}].
+
+Analyze this chronological evolution of thoughts. What is the overarching narrative of this journey? How did their perspective shift from the first word to the last? What is the hidden philosophical relationship between these concepts?
+
+You MUST respond in EXACTLY the following format, with no extra text or markdown:
+
+CONSTELLATION: <A striking, beautiful 2-4 word name for this specific pattern of thoughts, like "The Constellation of Anxious Clarity" or "The Architecture of Patience">
+MESSAGE: <A profound, thoughtful 2-sentence realization about how these specific concepts weave together into a greater truth.>`;
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: `Please synthesize my mind walk journey: [${wordPath.join(' → ')}]` }
+  ];
+
+  let data;
+  switch (provider) {
+    case 'anthropic':
+      data = await callAnthropic(apiKey, resolvedModel, messages, resolvedMax);
+      break;
+    case 'google':
+      data = await callGoogle(apiKey, resolvedModel, messages, resolvedMax);
+      break;
+    case 'openrouter':
+      data = await callOpenAICompatible(baseUrl, apiKey, resolvedModel, messages, resolvedMax, {
+        'HTTP-Referer': window.location.origin,
+        'X-Title':      'MindWalk',
+      });
+      break;
+    case 'cloudflare-workers':
+      data = await callCloudflareWorkers(apiKey, resolvedModel, messages, resolvedMax);
+      break;
+    case 'cloudflare':
+      data = await callCloudflareGateway(apiKey, resolvedModel, messages, resolvedMax);
+      break;
+    default:
+      data = await callOpenAICompatible(baseUrl, apiKey, resolvedModel, messages, resolvedMax);
+      break;
+  }
+
+  const content = data.choices[0].message.content;
+
+  let constellation = "The Unknown Constellation";
+  let message = "A journey without a clear destination reveals its own path.";
+
+  const constMatch = content.match(/CONSTELLATION:\s*(.+)/i);
+  const msgMatch = content.match(/MESSAGE:\s*([\s\S]+)/i);
+
+  if (constMatch) constellation = constMatch[1].trim();
+  if (msgMatch) message = msgMatch[1].trim();
+
+  return { constellation, message };
+}

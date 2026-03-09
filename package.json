@@ -12,13 +12,21 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/share-tech-mono": "^5.2.7",
+    "@netlify/blobs": "^10.7.0",
+    "@resvg/resvg-js": "^2.6.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-rate-limit": "^7.3.1",
+    "html2canvas": "^1.4.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "three": "^0.163.0"
+    "satori": "^0.25.0",
+    "satori-html": "^0.3.2",
+    "three": "^0.163.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
