@@ -1038,6 +1038,54 @@ html, body, #root {
   line-height: 1.55;
 }
 
+/* ── Model fetch row ──────────────────────────────────────────────────────── */
+.model-fetch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.model-fetch-row .settings-label {
+  margin-bottom: 0;
+}
+
+.fetch-models-btn {
+  background: rgba(0, 0, 20, 0.58);
+  border: 1px solid var(--border);
+  color: var(--cyan);
+  padding: 4px 10px;
+  font-family: var(--font);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: border-color 0.18s, background 0.18s;
+}
+.fetch-models-btn:hover:not(:disabled) {
+  border-color: var(--cyan);
+  background: rgba(0, 255, 255, 0.08);
+}
+.fetch-models-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.fetch-models-btn:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+}
+@media (prefers-color-scheme: light) {
+  .fetch-models-btn { background: rgba(240, 244, 252, 0.9); }
+}
+
+/* Wizard optional model section */
+.wizard-model-section {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
 /* Token slider */
 .settings-slider {
   width: 100%;
