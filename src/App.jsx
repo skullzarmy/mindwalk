@@ -377,9 +377,9 @@ export default function App() {
 
       {/* ── Top HUD bar ── */}
       <header className="hud-header">
-        <div className="hud-title">
+        <div className="hud-title" aria-label="MindWalk">
           <span className="hud-icon" aria-hidden="true">🧠</span>
-          <span>MINDWALK</span>
+          <span className="hud-title-text">MINDWALK</span>
         </div>
         <nav className="hud-controls" aria-label="Application controls">
           <button
@@ -389,7 +389,7 @@ export default function App() {
             aria-controls="chat-panel"
             title="Toggle conversation log"
           >
-            💬 CHAT
+            💬 <span className="btn-label">CHAT</span>
           </button>
           <button
             className={`hud-btn ${activePanel === 'map' ? 'active' : ''}`}
@@ -398,7 +398,7 @@ export default function App() {
             aria-controls="map-panel"
             title="View journey map"
           >
-            🗺 JOURNEY
+            🗺 <span className="btn-label">JOURNEY</span>
           </button>
           <button
             className={`hud-btn${activePanel === 'settings' ? ' active' : ''}${byokOnly && !hasUserKey() ? ' hud-btn-alert' : ''}`}
@@ -407,7 +407,7 @@ export default function App() {
             aria-controls="settings-panel"
             title="Settings"
           >
-            ⚙ SETTINGS
+            ⚙ <span className="btn-label">SETTINGS</span>
           </button>
         </nav>
       </header>
