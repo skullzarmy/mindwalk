@@ -4,6 +4,8 @@
   functions = "netlify/functions"
 
 [functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["satori", "@resvg/resvg-js", "satori-html"]
   included_files = ["server/fonts/**"]
 
 # Proxy all /api traffic to our Serverless wrapped Express backend
