@@ -1,0 +1,24 @@
+services:
+  mindwalk:
+    build: .
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      # Uncomment and set exactly one provider key (or use BYOK-only mode with none set):
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      # - XAI_API_KEY=${XAI_API_KEY}
+      # - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      # - CLOUDFLARE_API_KEY=${CLOUDFLARE_API_KEY}
+      # - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID}
+      # - CLOUDFLARE_GATEWAY_ID=${CLOUDFLARE_GATEWAY_ID}
+      # - DIGITALOCEAN_API_KEY=${DIGITALOCEAN_API_KEY}
+      # - DIGITALOCEAN_BASE_URL=${DIGITALOCEAN_BASE_URL}  # required for DigitalOcean provider
+      # Optional overrides:
+      # - AI_PROVIDER=openai
+      # - AI_MAX_TOKENS=150
+      # - TOKEN_QUOTA_PER_HOUR=10000
+      # - PORT=3001
+    restart: unless-stopped

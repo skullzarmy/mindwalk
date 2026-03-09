@@ -46,12 +46,115 @@ npm run dev
 # Express API   → http://localhost:3001
 ```
 
-### 5 · Production build
+## Deploying
+
+### Option A · Docker (recommended)
+
+A multi-stage `Dockerfile` and `docker-compose.yml` are included.
 
 ```bash
-npm run build
-NODE_ENV=production node server.js
+# Build and start (add your key to the environment first)
+OPENAI_API_KEY=sk-… docker compose up -d
 ```
+
+The app listens on **port 3001** inside the container.  Map it to any host
+port you like:
+
+```bash
+docker compose up -d            # http://localhost:3001
+# or override the port:
+PORT=8080 docker compose up -d  # http://localhost:8080
+```
+
+To pass a different provider key, uncomment the relevant line in
+`docker-compose.yml` (or use a `.env` file alongside it):
+
+```bash
+# .env (alongside docker-compose.yml)
+ANTHROPIC_API_KEY=sk-ant-…
+```
+
+To rebuild after source changes:
+
+```bash
+docker compose up -d --build
+```
+
+---
+
+### Option B · Node.js (direct)
+
+Requires Node.js ≥ 18.
+
+```bash
+# 1. Install
+npm install
+
+# 2. Configure
+cp .env.example .env
+# edit .env — set your API key
+
+# 3. Build the frontend
+npm run build
+
+# 4. Start the server
+NODE_ENV=production node server.js
+# → http://localhost:3001
+```
+
+Override the port with the `PORT` env var:
+
+```bash
+PORT=8080 NODE_ENV=production node server.js
+```
+
+---
+
+### Option C · Netlify
+
+A `netlify.toml` and serverless function wrapper (`netlify/functions/api.js`)
+are included for one-click Netlify deployment.
+
+1. Connect your fork to a Netlify site.
+2. In **Site configuration → Environment variables**, add your AI provider key (e.g. `OPENAI_API_KEY`).
+3. Deploy — Netlify runs `npm run build` automatically and routes `/api/*` to
+   the serverless function.
+
+---
+
+### Environment variables reference
+
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `3001` | Port the Express server listens on |
+| `NODE_ENV` | — | Set to `production` for production builds |
+| `AI_PROVIDER` | auto-detect | Pin a provider: `openai` \| `anthropic` \| `google` \| `xai` \| `digitalocean` \| `cloudflare` \| `openrouter` |
+| `AI_MAX_TOKENS` | `150` | Maximum tokens per AI response |
+| `TOKEN_QUOTA_PER_HOUR` | `10000` | Hourly token budget per IP |
+| `OPENAI_API_KEY` | — | OpenAI key |
+| `OPENAI_MODEL` | `gpt-3.5-turbo` | OpenAI model override |
+| `ANTHROPIC_API_KEY` | — | Anthropic key |
+| `ANTHROPIC_MODEL` | `claude-haiku-4-5` | Anthropic model override |
+| `GOOGLE_API_KEY` | — | Google Gemini key |
+| `GOOGLE_MODEL` | `gemini-1.5-flash` | Google model override |
+| `XAI_API_KEY` | — | xAI / Grok key |
+| `XAI_MODEL` | `grok-3-mini` | xAI model override |
+| `DIGITALOCEAN_API_KEY` | — | DigitalOcean GenAI key |
+| `DIGITALOCEAN_BASE_URL` | — | DigitalOcean agent endpoint URL (**required** for this provider) |
+| `DIGITALOCEAN_MODEL` | `n8n-meta-llama-3-1-70b-instruct` | DigitalOcean model override |
+| `CLOUDFLARE_API_KEY` | — | Cloudflare API token |
+| `CLOUDFLARE_ACCOUNT_ID` | — | Cloudflare account ID |
+| `CLOUDFLARE_GATEWAY_ID` | — | Optional: Cloudflare AI Gateway ID |
+| `CLOUDFLARE_MODEL` | `@cf/meta/llama-3.1-8b-instruct` | Cloudflare model override |
+| `OPENROUTER_API_KEY` | — | OpenRouter key |
+| `OPENROUTER_MODEL` | `openai/gpt-3.5-turbo` | OpenRouter model override |
+
+> **BYOK-only mode:** Leave all provider keys unset and the server starts
+> without an API key.  Users are guided through a 3-step in-browser wizard to
+> enter and optionally encrypt their own key.  No key ever reaches the server in
+> this mode.
+
+---
 
 ## Supported AI Providers
 
@@ -205,3 +308,8 @@ browser.
 If a key was stored in plain-text `localStorage` by an older version of the
 app, it is automatically migrated to `sessionStorage` (session-only) and the
 plain-text copy is scrubbed from `localStorage` on first load.
+
+## License
+
+MindWalk is released into the public domain under the
+[Unlicense](LICENSE).  Do whatever you want with it.
