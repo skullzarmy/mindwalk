@@ -4,6 +4,7 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { validateChatRequest } from './middleware/validateChatRequest.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -331,12 +332,8 @@ app.get('/api/config', configLimiter, (_req, res) => {
   res.json({ byokOnly: !hasKey, serverProvider: hasKey ? provider : null });
 });
 
-app.post('/api/chat', adaptiveChatLimiter, async (req, res) => {
+app.post('/api/chat', adaptiveChatLimiter, validateChatRequest, async (req, res) => {
   const { messages } = req.body;
-
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return res.status(400).json({ error: 'messages array is required' });
-  }
 
   // Phase 4: token quota check before hitting the AI provider
   const estimatedTokens = estimateTokens(messages);
