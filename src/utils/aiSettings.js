@@ -9,7 +9,7 @@ const STORAGE_KEY = 'mindwalk_ai_settings';
 export const SUPPORTED_PROVIDERS = [
   { id: 'openai',     label: 'OpenAI',          defaultModel: 'gpt-3.5-turbo',         keyPlaceholder: 'sk-...' },
   { id: 'anthropic',  label: 'Anthropic Claude', defaultModel: 'claude-haiku-4-5',      keyPlaceholder: 'sk-ant-...' },
-  { id: 'google',     label: 'Google Gemini',    defaultModel: 'gemini-1.5-flash',      keyPlaceholder: 'AIza...' },
+  { id: 'google',     label: 'Google Gemini',    defaultModel: 'gemini-2.0-flash',      keyPlaceholder: 'AIza...' },
   { id: 'xai',        label: 'xAI / Grok',       defaultModel: 'grok-3-mini',           keyPlaceholder: 'xai-...' },
   { id: 'openrouter',         label: 'OpenRouter',              defaultModel: 'openai/gpt-3.5-turbo',            keyPlaceholder: 'sk-or-...' },
   { id: 'cloudflare-workers', label: 'Cloudflare Workers AI',   defaultModel: '@cf/meta/llama-3.1-8b-instruct', keyPlaceholder: 'accountId:apiToken' },

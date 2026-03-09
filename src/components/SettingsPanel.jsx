@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getSettings, saveSettings, clearSettings, getApiKey, setApiKey, clearApiKey, SUPPORTED_PROVIDERS } from '../utils/aiSettings.js';
 import { saveEncryptedKey, clearEncryptedKey, saveSessionKey, clearSessionKey, hasEncryptedKey } from '../utils/secureStorage.js';
+import { fetchModels } from '../utils/modelFetcher.js';
 
 // Storage mode label copy — kept as constants so wizard and full panel stay in sync
 const LABEL_SESSION   = <><strong>This session only</strong> — cleared when you close this tab</>;
@@ -33,6 +34,11 @@ export default function SettingsPanel({
   const [saveError,     setSaveError]     = useState('');
   const [isSaving,      setIsSaving]      = useState(false);
   const [serverHasKey,  setServerHasKey]  = useState(false);
+  // Model fetch state
+  const [availableModels, setAvailableModels] = useState([]);
+  const [modelsLoading,   setModelsLoading]   = useState(false);
+  const [modelsError,     setModelsError]     = useState('');
+  const [useCustomModel,  setUseCustomModel]  = useState(false);
   const headingId = 'settings-panel-title';
 
   // Re-read settings each time panel opens
@@ -61,6 +67,7 @@ export default function SettingsPanel({
   useEffect(() => { setStep(wizardMode ? 1 : 0); }, [wizardMode]);
 
   const selectedProvider = SUPPORTED_PROVIDERS.find(p => p.id === settings.provider) || SUPPORTED_PROVIDERS[0];
+  const defaultModelOption = `— default (${selectedProvider.defaultModel}) —`;
 
   const handleSave = async () => {
     setSaveError('');
@@ -109,6 +116,30 @@ export default function SettingsPanel({
     }
   };
 
+  const handleFetchModels = async (providerOverride, keyOverride) => {
+    const provider = providerOverride || settings.provider;
+    const apiKey   = keyOverride   || settings.apiKey;
+    setModelsLoading(true);
+    setModelsError('');
+    try {
+      const models = await fetchModels(provider, apiKey);
+      setAvailableModels(models);
+      setUseCustomModel(false);
+    } catch (err) {
+      setModelsError(err.message || 'Failed to fetch models.');
+      setAvailableModels([]);
+    } finally {
+      setModelsLoading(false);
+    }
+  };
+
+  const handleProviderChange = (providerId) => {
+    setSettings(s => ({ ...s, provider: providerId, model: '' }));
+    setAvailableModels([]);
+    setModelsError('');
+    setUseCustomModel(false);
+  };
+
   // ── Wizard (BYOK-only first-run) ─────────────────────────────────────────
   if (step > 0) {
     return (
@@ -153,7 +184,7 @@ export default function SettingsPanel({
                   <button
                     key={p.id}
                     className={`provider-btn${settings.provider === p.id ? ' selected' : ''}`}
-                    onClick={() => setSettings(s => ({ ...s, provider: p.id, model: '' }))}
+                    onClick={() => handleProviderChange(p.id)}
                   >
                     {p.label}
                   </button>
@@ -255,6 +286,59 @@ export default function SettingsPanel({
               )}
 
               {saveError && <p className="settings-error" role="alert">{saveError}</p>}
+
+              {/* Optional: fetch & pick a model once the key is entered */}
+              {settings.apiKey.trim() && (
+                <div className="wizard-model-section">
+                  <div className="model-fetch-row">
+                    <p className="settings-label" style={{ margin: 0 }}>
+                      MODEL <span className="settings-optional">(optional)</span>
+                    </p>
+                    <button
+                      className="fetch-models-btn"
+                      onClick={() => handleFetchModels(settings.provider, settings.apiKey)}
+                      disabled={modelsLoading}
+                      aria-label="Fetch available models from provider"
+                    >
+                      {modelsLoading ? '⏳ FETCHING…' : '↻ FETCH MODELS'}
+                    </button>
+                  </div>
+                  {modelsError && <p className="settings-error" role="alert">{modelsError}</p>}
+                  {availableModels.length > 0 && !useCustomModel ? (
+                    <select
+                      value={settings.model}
+                      onChange={e => {
+                        if (e.target.value === '__custom__') {
+                          setUseCustomModel(true);
+                          setSettings(s => ({ ...s, model: '' }));
+                        } else {
+                          setSettings(s => ({ ...s, model: e.target.value }));
+                        }
+                      }}
+                      className="settings-select"
+                      aria-label="Select model"
+                    >
+                      <option value="">{defaultModelOption}</option>
+                      {availableModels.map(m => (
+                        <option key={m.id} value={m.id}>{m.label}</option>
+                      ))}
+                      <option value="__custom__">— enter custom model name —</option>
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={settings.model}
+                      onChange={e => setSettings(s => ({ ...s, model: e.target.value }))}
+                      placeholder={selectedProvider.defaultModel}
+                      className="settings-input"
+                      aria-label="Model name override"
+                    />
+                  )}
+                  {availableModels.length > 0 && (
+                    <p className="settings-note">{availableModels.length} models available</p>
+                  )}
+                </div>
+              )}
 
               <div className="wizard-nav">
                 <button className="cancel-btn" onClick={() => setStep(1)}>← BACK</button>
@@ -405,7 +489,7 @@ export default function SettingsPanel({
           <select
             id="settings-provider"
             value={settings.provider}
-            onChange={e => setSettings(s => ({ ...s, provider: e.target.value, model: '' }))}
+            onChange={e => handleProviderChange(e.target.value)}
             className="settings-select"
           >
             {SUPPORTED_PROVIDERS.map(p => (
@@ -514,18 +598,56 @@ export default function SettingsPanel({
         </div>
 
         <div className="settings-section">
-          <label htmlFor="settings-model" className="settings-label">
-            MODEL <span className="settings-optional">(optional override)</span>
-          </label>
-          <input
-            id="settings-model"
-            type="text"
-            value={settings.model}
-            onChange={e => setSettings(s => ({ ...s, model: e.target.value }))}
-            placeholder={selectedProvider.defaultModel}
-            className="settings-input"
-            aria-label="Model name override"
-          />
+          <div className="model-fetch-row">
+            <label htmlFor="settings-model" className="settings-label">
+              MODEL <span className="settings-optional">(optional override)</span>
+            </label>
+            <button
+              className="fetch-models-btn"
+              onClick={() => handleFetchModels()}
+              disabled={!settings.apiKey.trim() || modelsLoading}
+              title={settings.apiKey.trim() ? 'Fetch available models from provider' : 'Enter an API key first'}
+              aria-label="Fetch available models from provider"
+            >
+              {modelsLoading ? '⏳ FETCHING…' : '↻ FETCH MODELS'}
+            </button>
+          </div>
+          {modelsError && <p className="settings-error" role="alert">{modelsError}</p>}
+          {availableModels.length > 0 && !useCustomModel ? (
+            <select
+              id="settings-model"
+              value={settings.model}
+              onChange={e => {
+                if (e.target.value === '__custom__') {
+                  setUseCustomModel(true);
+                  setSettings(s => ({ ...s, model: '' }));
+                } else {
+                  setSettings(s => ({ ...s, model: e.target.value }));
+                }
+              }}
+              className="settings-select"
+              aria-label="Select model"
+            >
+              <option value="">{defaultModelOption}</option>
+              {availableModels.map(m => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
+              <option value="__custom__">— enter custom model name —</option>
+            </select>
+          ) : (
+            <input
+              id="settings-model"
+              type="text"
+              value={settings.model}
+              onChange={e => setSettings(s => ({ ...s, model: e.target.value }))}
+              placeholder={selectedProvider.defaultModel}
+              className="settings-input"
+              aria-label="Model name override"
+            />
+          )}
+          {availableModels.length > 0 && (
+            <p className="settings-note">{availableModels.length} models available — select one or enter a custom name.</p>
+          )}
         </div>
 
         <div className="settings-section">
