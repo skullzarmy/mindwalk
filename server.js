@@ -3,10 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
-import { z } from 'zod';
-import { getStore } from '@netlify/blobs';
 import { validateChatRequest } from './middleware/validateChatRequest.js';
-import { generateAndStoreShareImage } from './server/generateShare.js';
 
 // Use process.cwd() instead of fileURLToPath(import.meta.url) so this module
 // works in both native ESM and esbuild CJS bundles (Netlify Functions).
@@ -461,55 +458,6 @@ MESSAGE: <1 punchy, profound sentence about how these concepts connect. Under 15
     res.json({ constellation, message });
   } catch (err) {
     res.status(500).json({ error: err.message });
-  }
-});
-
-// ── Secure Share Image Generation (Phase 5 Blob Architecture) ───────────────
-const shareSchema = z.object({
-  constellationName: z.string().trim().min(1).max(100),
-  message: z.string().trim().min(1).max(300),
-  wordPath: z.array(z.string().trim().max(50)).min(1).max(20),
-  format: z.enum(['portrait', 'landscape']).default('portrait')
-});
-
-app.post('/api/generate-share', adaptiveChatLimiter, async (req, res) => {
-  try {
-    // 1. Strict validation to prevent XSS, massive payload DoS, or SVG injection
-    const validated = shareSchema.parse(req.body);
-    
-    // 2. Generate securely via Satori/Resvg
-    const imageUrlOrBase64 = await generateAndStoreShareImage(
-      validated.constellationName,
-      validated.wordPath,
-      validated.message,
-      validated.format
-    );
-    
-    res.json({ url: imageUrlOrBase64 });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Invalid share payload properties', details: error.errors });
-    }
-    console.error("Generator Error:", error);
-    res.status(500).json({ error: 'Failed to generate share image' });
-  }
-});
-
-app.get('/api/blob/:key', async (req, res) => {
-  try {
-    const siteId = process.env.NETLIFY_SITE_ID || 'local-dev-fallback';
-    const blobsAuth = process.env.NETLIFY_BLOBS_TOKEN;
-    if (!blobsAuth) return res.status(404).send('Blobs not configured locally');
-    
-    const store = getStore({ name: 'mindwalk-shares', siteID: siteId, token: blobsAuth });
-    const blob = await store.get(req.params.key, { type: 'stream' });
-    if (!blob) return res.status(404).send('Not found');
-
-    res.setHeader('Content-Type', 'image/png');
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    blob.pipe(res);
-  } catch (err) {
-    res.status(500).send('Error retrieving blob');
   }
 });
 

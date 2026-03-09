@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { generateShareImage } from '../utils/generateShareImage.js';
 
 // ── Custom Share Modal UI ───────────────────────────────────────────────────
 function ShareModal({ onClose, result, wordPath }) {
@@ -9,40 +10,22 @@ function ShareModal({ onClose, result, wordPath }) {
   const shareText = `I discovered the ${result.constellation} Constellation on MindWalk!\n\n"${result.message}"\n\n#MindWalk`;
 
   /**
-   * Concurrently pre-generates both portrait and landscape formats from the backend
+   * Concurrently generates both portrait and landscape formats client-side
    * so toggling is instantaneous for the user.
    */
   const generateBothFormats = async () => {
     setIsGenerating(true);
 
     try {
-      const fetchFormat = async (fmt) => {
-        const response = await fetch('/api/generate-share', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            constellationName: result.constellation,
-            wordPath: wordPath,
-            message: result.message,
-            format: fmt
-          })
-        });
-
-        if (!response.ok) throw new Error(`Failed to generate ${fmt}`);
-        const data = await response.json();
-        return data.url;
-      };
-
       const [portraitUrl, landscapeUrl] = await Promise.all([
-        fetchFormat('portrait'),
-        fetchFormat('landscape')
+        generateShareImage(result.constellation, wordPath, result.message, 'portrait'),
+        generateShareImage(result.constellation, wordPath, result.message, 'landscape'),
       ]);
 
       setImages({ portrait: portraitUrl, landscape: landscapeUrl });
 
     } catch (err) {
-      console.error("Secure Capture Failed:", err);
-      // Failsafe: if generation fails, close modal or show error state
+      console.error("Image generation failed:", err.message || err);
     } finally {
       setIsGenerating(false);
     }
@@ -63,12 +46,7 @@ function ShareModal({ onClose, result, wordPath }) {
   };
 
   const handleX = () => {
-    // Twitter Intent does not support Data URIs (large base64 payloads).
-    // In production we link the public blob path, in local dev testing we safely fallback to the main site link.
-    const isBlobUrl = currentImage && currentImage.startsWith('/api/');
-    const urlPayload = isBlobUrl ? `\n\nhttps://mindwalk.joepeterson.work${currentImage.replace('/api', '')}` : `\n\nhttps://mindwalk.joepeterson.work`;
-    
-    const text = encodeURIComponent(shareText + urlPayload);
+    const text = encodeURIComponent(shareText + '\n\nhttps://mindwalk.joepeterson.work');
     window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank');
   };
 
