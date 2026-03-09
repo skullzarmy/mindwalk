@@ -172,6 +172,25 @@ html, body, #root {
   color: var(--cyan);
   text-shadow: 0 0 18px var(--cyan), 0 0 38px rgba(0,255,255,0.25);
 }
+/* Logo as a button — reset browser styles, keep title appearance */
+.hud-title-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font);
+  border-radius: 3px;
+  transition: opacity 0.15s, text-shadow 0.15s;
+}
+.hud-title-btn:hover {
+  opacity: 0.85;
+  text-shadow: 0 0 24px var(--cyan), 0 0 48px rgba(0,255,255,0.4);
+}
+.hud-title-btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.hud-title-btn.active {
+  text-shadow: 0 0 24px var(--purple), 0 0 48px rgba(192,132,252,0.4);
+  color: var(--purple);
+}
 .hud-icon { font-size: 1.5rem; }
 
 .hud-controls {
@@ -382,6 +401,91 @@ html, body, #root {
   clip-path: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
 }
 .chat-panel.open { transform: translateX(0); }
+
+/* Welcome panel slides from the LEFT (wizard intro) */
+.welcome-panel {
+  left: 0;
+  transform: translateX(-100%);
+  border-left: none;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
+}
+.welcome-panel.open { transform: translateX(0); }
+
+.welcome-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.welcome-tagline {
+  font-size: 1rem;
+  color: var(--cyan);
+  line-height: 1.5;
+  padding: 12px 0 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.welcome-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.welcome-section-title {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+  font-weight: normal;
+}
+
+.welcome-steps {
+  padding-left: 1.4em;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.welcome-features {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.welcome-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.welcome-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+
+.welcome-link {
+  color: var(--cyan);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.welcome-link:hover { color: var(--purple); }
+
+.welcome-cta {
+  margin-top: auto;
+  padding: 12px 14px;
+  background: rgba(0, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
 
 /* Editor slides from the RIGHT */
 .editor-panel {

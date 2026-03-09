@@ -3,6 +3,7 @@ import WordCloud3D   from './components/WordCloud3D.jsx';
 import ChatPanel     from './components/ChatPanel.jsx';
 import JourneyPanel  from './components/JourneyPanel.jsx';
 import SettingsPanel from './components/SettingsPanel.jsx';
+import WelcomePanel  from './components/WelcomePanel.jsx';
 import JourneyTracker from './components/JourneyTracker.jsx';
 import SynthesisOverlay from './components/SynthesisOverlay.jsx';
 import { extractWords } from './utils/textProcessing.js';
@@ -53,6 +54,7 @@ export default function App() {
   const [pathStyle,       setPathStyle]       = useState('line');
   const [byokOnly,        setByokOnly]        = useState(false);
   const [wizardMode,      setWizardMode]      = useState(false);
+  const [showWelcome,     setShowWelcome]     = useState(false);
   
   // Synthesis state
   const [isSynthesizing,  setIsSynthesizing]  = useState(false);
@@ -108,6 +110,7 @@ export default function App() {
           setByokOnly(serverByokOnly);
           if (serverByokOnly && !hasUserKey()) {
             setWizardMode(true);
+            setShowWelcome(true);
             setActivePanel('settings');
           }
         })
@@ -115,6 +118,7 @@ export default function App() {
           if (!hasUserKey()) {
             setByokOnly(true);
             setWizardMode(true);
+            setShowWelcome(true);
             setActivePanel('settings');
           }
         });
@@ -162,6 +166,7 @@ export default function App() {
         setByokOnly(serverByokOnly);
         if (serverByokOnly && !hasUserKey()) {
           setWizardMode(true);
+          setShowWelcome(true);
           setActivePanel('settings');
         }
       })
@@ -169,6 +174,7 @@ export default function App() {
         if (!hasUserKey()) {
           setByokOnly(true);
           setWizardMode(true);
+          setShowWelcome(true);
           setActivePanel('settings');
         }
       });
@@ -433,10 +439,16 @@ export default function App() {
 
       {/* ── Top HUD bar ── */}
       <header className="hud-header">
-        <div className="hud-title" aria-label="MindWalk">
+        <button
+          className={`hud-title hud-title-btn${showWelcome ? ' active' : ''}`}
+          onClick={() => setShowWelcome(v => !v)}
+          aria-expanded={showWelcome}
+          aria-controls="welcome-panel"
+          title="About MindWalk"
+        >
           <span className="hud-icon" aria-hidden="true">🧠</span>
           <span className="hud-title-text">MINDWALK</span>
-        </div>
+        </button>
         
         {wordPath.length > 0 && (
           <JourneyTracker 
@@ -555,6 +567,10 @@ export default function App() {
       </footer>
 
       {/* ── Side panels ── */}
+      <WelcomePanel
+        isOpen={showWelcome}
+        onClose={() => setShowWelcome(false)}
+      />
       <ChatPanel
         messages={messages}
         isOpen={activePanel === 'chat'}
@@ -583,8 +599,8 @@ export default function App() {
         onPathColorChange={setPathColor}
         pathStyle={pathStyle}
         onPathStyleChange={setPathStyle}
-        onClose={() => { setWizardMode(false); setActivePanel(null); }}
-        onSave={() => { setWizardMode(false); setByokOnly(false); setActivePanel(null); }}
+        onClose={() => { setWizardMode(false); setShowWelcome(false); setActivePanel(null); }}
+        onSave={() => { setWizardMode(false); setShowWelcome(false); setByokOnly(false); setActivePanel(null); }}
       />
     </div>
   );
