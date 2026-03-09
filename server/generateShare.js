@@ -1,4 +1,3 @@
-import satori from 'satori';
 import { Resvg } from '@resvg/resvg-js';
 import { getStore } from '@netlify/blobs';
 import crypto from 'crypto';
@@ -210,11 +209,15 @@ export async function generateAndStoreShareImage(constellationName, wordPath, me
     </div>
   `;
 
-  // satori-html is ESM-only (no CJS export). When esbuild bundles this file for
-  // Netlify Functions in CJS mode, static imports of ESM-only packages are
-  // converted to require() calls which fail at runtime. Dynamic import() works
-  // in CJS modules and correctly loads the ESM package via the ESM loader.
-  const { html } = await import('satori-html');
+  // satori and satori-html are both ESM-only (no CJS export). When esbuild bundles
+  // this file for Netlify Functions in CJS mode, static imports of ESM-only packages
+  // are converted to require() calls which fail at runtime. Dynamic import() works
+  // in CJS modules and correctly loads ESM packages via the ESM loader.
+  // Load both in parallel to avoid two sequential network/disk round-trips.
+  const [{ default: satori }, { html }] = await Promise.all([
+    import('satori'),
+    import('satori-html'),
+  ]);
 
   const template = html(rawHTMLString);
   const svg = await satori(template, {
