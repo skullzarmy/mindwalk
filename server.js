@@ -9,7 +9,7 @@ import { getStore } from '@netlify/blobs';
 import { validateChatRequest } from './middleware/validateChatRequest.js';
 import { generateAndStoreShareImage } from './server/generateShare.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const SERVER_DIR = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 // Trust the first proxy hop (Vite or Netlify) so rate limiter reads X-Forwarded-For properly
 app.set('trust proxy', 1);
@@ -325,7 +325,7 @@ function adaptiveChatLimiter(req, res, next) {
 
 // Serve built frontend in production
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, 'dist')));
+  app.use(express.static(path.join(SERVER_DIR, 'dist')));
 }
 
 // Tells the client whether a server-side AI key is available so it knows
@@ -506,7 +506,7 @@ const staticLimiter = rateLimit({
 if (!process.env.NETLIFY) {
   if (process.env.NODE_ENV === 'production') {
     app.get('*', staticLimiter, (_req, res) => {
-      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+      res.sendFile(path.join(SERVER_DIR, 'dist', 'index.html'));
     });
   }
 
