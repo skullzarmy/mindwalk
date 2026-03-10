@@ -1,7 +1,10 @@
 /**
  * Client-side share image generator using the HTML Canvas 2D API.
- * Replicates the exact pixel-perfect design previously rendered server-side
- * with Satori + Resvg — same layout, same colour palette, same typography.
+ * Uses an iterative layout engine (measure → fit → draw) to guarantee that
+ * text never overlaps regardless of constellation name or message length.
+ * Font sizes are scaled down automatically until both the top section
+ * (badge + title) and bottom section (path + message + footer) fit with a
+ * guaranteed minimum gap between them.
  *
  * @param {string}   constellationName
  * @param {string[]} wordPath
@@ -19,33 +22,31 @@ export async function generateShareImage(
   const width  = isPortrait ? 1080 : 1200;
   const height = isPortrait ? 1920 :  630;
 
-  // ── Print Design Metrics (mirrors server/generateShare.js exactly) ──────────
-  const paddingX = isPortrait ? 120 : 100;
-  const paddingY = isPortrait ? 160 :  70;
+  // ── Canvas geometry ──────────────────────────────────────────────────────────
+  const paddingX     = isPortrait ? 120 : 100;
+  const paddingY     = isPortrait ? 160 :  70;
   const contentWidth = width - paddingX * 2;
 
-  const eyebrowSize     = isPortrait ? 28 : 22;
-  const eyebrowTracking = isPortrait ? 12 :  4;   // letter-spacing in px
+  // ── Fixed UI constants (never scaled) ────────────────────────────────────────
+  const EYEBROW_FS      = isPortrait ? 28 : 22; // eyebrow badge font size
+  const EYEBROW_TRACK   = isPortrait ? 12 :  4; // letter-spacing in px
+  const FOOTER_FS       = isPortrait ? 24 : 18;
+  const BADGE_PAD_H     = 16;                   // horizontal inner padding for badge
+  const PATH_PAD_H      = 24;                   // horizontal inner padding for path box
+  const PATH_PAD_V      = 16;                   // vertical inner padding for path box
+  const MSG_ACCENT_W    = 6;                    // width of left accent bar on message
+  const MSG_ACCENT_PAD  = 24;                   // gap between accent bar and message text
+  const BADGE_GAP       = isPortrait ? 40 : 20; // space between badge bottom and title top
+  const PATH_MARGIN_B   = isPortrait ? 50 : 30; // space between path box and message
+  const FOOTER_MARGIN_T = isPortrait ? 80 : 40; // space between message and footer
+  const MIN_GAP         = isPortrait ? 80 : 30; // guaranteed gap between top and bottom
 
-  const maxTitleSize  = isPortrait ? 190 : 96;
-  const minTitleSize  = isPortrait ?  90 : 60;
-  const charCount     = Math.max(8, constellationName.length);
-  const calcSize      = Math.floor((width - paddingX * 2) / (charCount * 0.55));
-  const titleFontSize = Math.max(minTitleSize, Math.min(maxTitleSize, calcSize));
-
-  const pathFontSize = isPortrait ? 36 : 24;
-  const msgFontSize  = isPortrait ? 56 : 36;
-  const msgLineHeight = isPortrait ? 1.4 : 1.3;
-  const footerFontSize = isPortrait ? 24 : 18;
-
-  // ── Ensure web-fonts are ready before measuring ──────────────────────────────
-  // Inter is registered via @fontsource imports in main.jsx.
-  // Share Tech Mono is loaded from Google Fonts (index.html).
+  // ── Ensure fonts are loaded before measuring ──────────────────────────────────
   await Promise.all([
-    document.fonts.load(`700 ${titleFontSize}px "Inter"`),
-    document.fonts.load(`400 ${msgFontSize}px "Inter"`),
-    document.fonts.load(`400 ${pathFontSize}px "Share Tech Mono"`),
-  ]).catch(() => { /* graceful fallback to system fonts */ });
+    document.fonts.load(`700 96px "Inter"`),
+    document.fonts.load(`400 56px "Inter"`),
+    document.fonts.load(`400 36px "Share Tech Mono"`),
+  ]).catch(() => { /* fall back to system fonts */ });
 
   // ── Canvas setup ─────────────────────────────────────────────────────────────
   const canvas = document.createElement('canvas');
@@ -53,14 +54,76 @@ export async function generateShareImage(
   canvas.height = height;
   const ctx = canvas.getContext('2d');
 
-  // ── 1. Background ─────────────────────────────────────────────────────────
+  // ── Initial variable font sizes (character-count driven title) ───────────────
+  const maxTitleFS = isPortrait ? 190 :  96;
+  const minTitleFS = isPortrait ?  90 :  60;
+  const charCount  = Math.max(8, constellationName.length);
+  const calcFS     = Math.floor(contentWidth / (charCount * 0.55));
+
+  let titleFS = Math.max(minTitleFS, Math.min(maxTitleFS, calcFS));
+  let msgFS   = isPortrait ? 56 : 36;
+  let pathFS  = isPortrait ? 36 : 24;
+
+  const totalAvail = height - paddingY * 2;
+
+  // ── Layout measurement (pure — no drawing) ───────────────────────────────────
+  // Returns the pixel height of the top section and bottom section for the
+  // given variable font sizes.  The ctx font is a side effect used only for
+  // measuring; it is reset before drawing begins.
+  const measureLayout = () => {
+    const badgeH = Math.round(EYEBROW_FS * 1.6);
+
+    // Top section: badge + gap + title lines
+    ctx.font = `700 ${titleFS}px "Inter"`;
+    const titleLines = _wrapText(ctx, constellationName.toUpperCase(), contentWidth);
+    const titleLineH = Math.ceil(titleFS * 1.1); // slightly generous for descenders
+    const titleH     = titleLines.length * titleLineH;
+    const topH       = badgeH + BADGE_GAP + titleH;
+
+    // Bottom section: path box + margin + message + margin + footer
+    ctx.font = `400 ${pathFS}px "Share Tech Mono"`;
+    const pathStr   = wordPath.map(w => w.toUpperCase()).join('  \u2192  ');
+    const pathLines = _wrapText(ctx, pathStr, contentWidth - PATH_PAD_H * 2);
+    const pathLineH = Math.round(pathFS * 1.6);
+    const pathContH = pathLines.length * pathLineH + PATH_PAD_V * 2;
+
+    ctx.font = `400 ${msgFS}px "Inter"`;
+    const msgLines = _wrapText(ctx, message, contentWidth - MSG_ACCENT_W - MSG_ACCENT_PAD);
+    const msgLineH = Math.round(msgFS * (isPortrait ? 1.4 : 1.3));
+    const msgH     = msgLines.length * msgLineH;
+
+    const bottomH = pathContH + PATH_MARGIN_B + msgH + FOOTER_MARGIN_T + FOOTER_FS;
+
+    return { badgeH, titleLines, titleLineH, titleH, topH,
+             pathStr, pathLines, pathLineH, pathContH,
+             msgLines, msgLineH, msgH, bottomH };
+  };
+
+  // ── Iterative scaling: shrink variable fonts until content fits ───────────────
+  // Each pass reduces the fonts proportionally.  sqrt() softens the reduction
+  // so we don't overshoot on the first pass; 6 passes always converge.
+  for (let pass = 0; pass < 6; pass++) {
+    const { topH, bottomH } = measureLayout();
+    const needed = topH + MIN_GAP + bottomH;
+    if (needed <= totalAvail) break;
+
+    const scale = Math.sqrt(totalAvail / needed) * 0.96; // 4% reduction for safety
+    titleFS = Math.max(isPortrait ? 40 : 24, Math.floor(titleFS * scale));
+    msgFS   = Math.max(isPortrait ? 22 : 14, Math.floor(msgFS   * scale));
+    pathFS  = Math.max(14,                   Math.floor(pathFS  * scale));
+  }
+
+  // ── Final measurement with converged font sizes ───────────────────────────────
+  const L = measureLayout();
+
+  // ── Draw: background ──────────────────────────────────────────────────────────
   ctx.fillStyle = '#030308';
   ctx.fillRect(0, 0, width, height);
 
-  // ── 2. Procedural Constellation ─────────────────────────────────────────
+  // ── Draw: procedural constellation ────────────────────────────────────────────
   _drawConstellation(ctx, wordPath, width, height, isPortrait);
 
-  // ── 3. Gradient overlay (depth / readability) ─────────────────────────────
+  // ── Draw: depth gradient overlay ─────────────────────────────────────────────
   const overlay = ctx.createLinearGradient(0, 0, 0, height);
   overlay.addColorStop(0,   'rgba(3,3,8,0.10)');
   overlay.addColorStop(0.5, 'rgba(3,3,8,0.60)');
@@ -68,56 +131,21 @@ export async function generateShareImage(
   ctx.fillStyle = overlay;
   ctx.fillRect(0, 0, width, height);
 
-  // ── 4. Measure all text blocks for layout (measure → draw) ─────────────────
-
-  // Eyebrow badge
-  ctx.font = `400 ${eyebrowSize}px "Share Tech Mono"`;
-  _setLetterSpacing(ctx, `${eyebrowTracking}px`);
-  const eyebrowText    = 'MINDWALK CONSTELLATION';
-  const eyebrowMetrics = ctx.measureText(eyebrowText);
-  _setLetterSpacing(ctx, '0px');
-  // Include manual letter-spacing total (extra spacing after each character)
-  const eyebrowExtraSpacing = eyebrowTracking * eyebrowText.length;
-  const badgePadH = 16;
-  const badgeH    = Math.round(eyebrowSize * 1.6);
-  const badgeW    = eyebrowMetrics.width + eyebrowExtraSpacing + badgePadH * 2;
-
-  // Title
-  ctx.font = `700 ${titleFontSize}px "Inter"`;
-  const titleText  = constellationName.toUpperCase();
-  const titleLines = _wrapText(ctx, titleText, contentWidth);
-  const titleLineH = titleFontSize * 1.05;
-
-  // Path container
-  ctx.font = `400 ${pathFontSize}px "Share Tech Mono"`;
-  const pathPadH = 24, pathPadV = 16;
-  const pathStr   = wordPath.map(w => w.toUpperCase()).join('  \u2192  ');
-  const pathLines = _wrapText(ctx, pathStr, contentWidth - pathPadH * 2);
-  const pathLineH = Math.round(pathFontSize * 1.6);
-  const pathContainerH = pathLines.length * pathLineH + pathPadV * 2;
-
-  // Message
-  ctx.font = `400 ${msgFontSize}px "Inter"`;
-  const msgAccentW  = 6;
-  const msgAccentPad = 24;
-  const msgLines    = _wrapText(ctx, message, contentWidth - msgAccentW - msgAccentPad);
-  const msgLineH    = Math.round(msgFontSize * msgLineHeight);
-  const totalMsgH   = msgLines.length * msgLineH;
-
-  // Bottom anchor total height
-  const pathMarginBottom = isPortrait ? 50 : 30;
-  const footerMarginTop  = isPortrait ? 80 : 40;
-  const totalBottomH = (
-    pathContainerH + pathMarginBottom +
-    totalMsgH + footerMarginTop +
-    footerFontSize
-  );
-
-  // ── 5. TOP ANCHOR ─────────────────────────────────────────────────────────
+  // ── Draw: TOP ANCHOR ──────────────────────────────────────────────────────────
   let topY = paddingY;
 
-  // Eyebrow badge
-  _drawRoundRect(ctx, paddingX, topY, badgeW, badgeH, badgeH / 2);
+  // Eyebrow badge — measure text at the fixed font so badge width is exact
+  ctx.font = `400 ${EYEBROW_FS}px "Share Tech Mono"`;
+  _setLetterSpacing(ctx, `${EYEBROW_TRACK}px`);
+  const EYEBROW_LABEL = 'MINDWALK CONSTELLATION';
+  const eyebrowW      = ctx.measureText(EYEBROW_LABEL).width;
+  _setLetterSpacing(ctx, '0px');
+  // Browsers without letterSpacing support under-report width; add manual spacing.
+  // Letter-spacing applies after each character except the last, hence length - 1.
+  const extraW  = _supportsLetterSpacing ? 0 : EYEBROW_TRACK * (EYEBROW_LABEL.length - 1);
+  const badgeW  = Math.min(contentWidth, eyebrowW + extraW + BADGE_PAD_H * 2);
+
+  _drawRoundRect(ctx, paddingX, topY, badgeW, L.badgeH, L.badgeH / 2);
   ctx.fillStyle   = 'rgba(0,255,255,0.05)';
   ctx.fill();
   ctx.strokeStyle = 'rgba(0,255,255,0.40)';
@@ -125,33 +153,34 @@ export async function generateShareImage(
   ctx.stroke();
 
   ctx.fillStyle    = '#00ffff';
-  ctx.font         = `400 ${eyebrowSize}px "Share Tech Mono"`;
+  ctx.font         = `400 ${EYEBROW_FS}px "Share Tech Mono"`;
   ctx.textBaseline = 'middle';
   ctx.textAlign    = 'left';
-  _setLetterSpacing(ctx, `${eyebrowTracking}px`);
-  ctx.fillText(eyebrowText, paddingX + badgePadH, topY + badgeH / 2);
+  _setLetterSpacing(ctx, `${EYEBROW_TRACK}px`);
+  ctx.fillText(EYEBROW_LABEL, paddingX + BADGE_PAD_H, topY + L.badgeH / 2);
   _setLetterSpacing(ctx, '0px');
 
-  topY += badgeH + (isPortrait ? 40 : 20);
+  topY += L.badgeH + BADGE_GAP;
 
-  // Title — huge gradient text spanning content width
-  ctx.font         = `700 ${titleFontSize}px "Inter"`;
-  ctx.textBaseline = 'top';
-  ctx.textAlign    = 'left';
-  const titleGrad  = ctx.createLinearGradient(paddingX, 0, paddingX + contentWidth, 0);
+  // Title — gradient text, lines already word-wrapped to contentWidth
+  const titleGrad = ctx.createLinearGradient(paddingX, 0, paddingX + contentWidth, 0);
   titleGrad.addColorStop(0,   '#ffffff');
   titleGrad.addColorStop(0.6, '#00ffff');
   titleGrad.addColorStop(1,   '#c084fc');
-  ctx.fillStyle = titleGrad;
-  titleLines.forEach((line, i) => {
-    ctx.fillText(line, paddingX, topY + i * titleLineH);
+  ctx.fillStyle    = titleGrad;
+  ctx.font         = `700 ${titleFS}px "Inter"`;
+  ctx.textBaseline = 'top';
+  ctx.textAlign    = 'left';
+  L.titleLines.forEach((line, i) => {
+    ctx.fillText(line, paddingX, topY + i * L.titleLineH);
   });
 
-  // ── 6. BOTTOM ANCHOR ──────────────────────────────────────────────────────
-  const bottomStartY = height - paddingY - totalBottomH;
+  // ── Draw: BOTTOM ANCHOR ───────────────────────────────────────────────────────
+  // Pinned to the bottom padding; gap between top and bottom is always ≥ MIN_GAP.
+  const bottomStartY = height - paddingY - L.bottomH;
 
   // Glassmorphic path container
-  _drawRoundRect(ctx, paddingX, bottomStartY, contentWidth, pathContainerH, 16);
+  _drawRoundRect(ctx, paddingX, bottomStartY, contentWidth, L.pathContH, 16);
   ctx.fillStyle   = 'rgba(255,255,255,0.03)';
   ctx.fill();
   ctx.strokeStyle = 'rgba(255,255,255,0.10)';
@@ -159,28 +188,34 @@ export async function generateShareImage(
   ctx.stroke();
 
   ctx.fillStyle    = '#c084fc';
-  ctx.font         = `400 ${pathFontSize}px "Share Tech Mono"`;
+  ctx.font         = `400 ${pathFS}px "Share Tech Mono"`;
   ctx.textBaseline = 'top';
-  pathLines.forEach((line, i) => {
-    ctx.fillText(line, paddingX + pathPadH, bottomStartY + pathPadV + i * pathLineH);
+  ctx.textAlign    = 'left';
+  L.pathLines.forEach((line, i) => {
+    ctx.fillText(
+      line,
+      paddingX + PATH_PAD_H,
+      bottomStartY + PATH_PAD_V + i * L.pathLineH
+    );
   });
 
-  // Message with left accent border
-  const msgY = bottomStartY + pathContainerH + pathMarginBottom;
+  // Message with left accent bar
+  const msgY = bottomStartY + L.pathContH + PATH_MARGIN_B;
   ctx.fillStyle = '#c084fc';
-  ctx.fillRect(paddingX, msgY, msgAccentW, totalMsgH);
+  ctx.fillRect(paddingX, msgY, MSG_ACCENT_W, L.msgH);
 
   ctx.fillStyle    = '#f8fafc';
-  ctx.font         = `400 ${msgFontSize}px "Inter"`;
+  ctx.font         = `400 ${msgFS}px "Inter"`;
   ctx.textBaseline = 'top';
-  msgLines.forEach((line, i) => {
-    ctx.fillText(line, paddingX + msgAccentW + msgAccentPad, msgY + i * msgLineH);
+  ctx.textAlign    = 'left';
+  L.msgLines.forEach((line, i) => {
+    ctx.fillText(line, paddingX + MSG_ACCENT_W + MSG_ACCENT_PAD, msgY + i * L.msgLineH);
   });
 
   // Branding footer — right-aligned
-  const footerY = msgY + totalMsgH + footerMarginTop;
+  const footerY = msgY + L.msgH + FOOTER_MARGIN_T;
   ctx.fillStyle    = 'rgba(255,255,255,0.40)';
-  ctx.font         = `400 ${footerFontSize}px "Share Tech Mono"`;
+  ctx.font         = `400 ${FOOTER_FS}px "Share Tech Mono"`;
   _setLetterSpacing(ctx, '2px');
   ctx.textBaseline = 'top';
   ctx.textAlign    = 'right';
@@ -191,11 +226,11 @@ export async function generateShareImage(
   return canvas.toDataURL('image/png');
 }
 
-// ── Internal helpers ──────────────────────────────────────────────────────────
+// ── Internal helpers ───────────────────────────────────────────────────────────
 
 /**
- * Sets ctx.letterSpacing when the property is supported by the browser.
- * Falls back silently — text still renders, just without tracking.
+ * Sets ctx.letterSpacing when supported.
+ * Feature-detected once at module load so there's no per-call try/catch.
  */
 const _supportsLetterSpacing = 'letterSpacing' in CanvasRenderingContext2D.prototype;
 function _setLetterSpacing(ctx, value) {
@@ -203,10 +238,11 @@ function _setLetterSpacing(ctx, value) {
 }
 
 /**
- * Word-wraps `text` to fit within `maxWidth` pixels given the current ctx font.
- * Returns at least one line.
+ * Word-wraps `text` to fit within `maxWidth` pixels at the current ctx font.
+ * Returns an empty array when text is empty or maxWidth is zero.
  */
 function _wrapText(ctx, text, maxWidth) {
+  if (!text || maxWidth <= 0) return [];
   const words = text.split(' ');
   const lines = [];
   let current = '';
@@ -243,8 +279,8 @@ function _drawRoundRect(ctx, x, y, w, h, r) {
 
 /**
  * Draws the procedural constellation background.
- * Uses the same deterministic seed algorithm as server/generateShare.js so the
- * same word path always produces the same constellation pattern.
+ * Uses the same deterministic seed algorithm so the same word path always
+ * produces the same constellation pattern across renders.
  */
 function _drawConstellation(ctx, words, w, h, isPortrait) {
   let seed = words.join('').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
@@ -276,7 +312,7 @@ function _drawConstellation(ctx, words, w, h, isPortrait) {
     points.push({ x: px, y: py });
   }
 
-  // Connecting lines — linear gradient cyan → purple, 40 % opacity
+  // Connecting lines — linear gradient cyan → purple, 40% opacity
   ctx.save();
   ctx.globalAlpha = 0.4;
   for (let i = 0; i < points.length - 1; i++) {
@@ -298,11 +334,10 @@ function _drawConstellation(ctx, words, w, h, isPortrait) {
   // Node glows + core circles
   points.forEach((p, i) => {
     const isEndpoint = i === 0 || i === points.length - 1;
-    const radius  = isEndpoint ? (isPortrait ? 14 : 10) : (isPortrait ? 8 : 6);
-    const glowR   = isEndpoint ? radius * 8 : radius * 6;
+    const radius = isEndpoint ? (isPortrait ? 14 : 10) : (isPortrait ? 8 : 6);
+    const glowR  = isEndpoint ? radius * 8 : radius * 6;
     const glowRGB = isEndpoint ? '192,132,252' : '0,255,255';
 
-    // Ambient radial glow
     const glowGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowR);
     glowGrad.addColorStop(0, `rgba(${glowRGB},0.3)`);
     glowGrad.addColorStop(1, `rgba(${glowRGB},0)`);
@@ -311,7 +346,6 @@ function _drawConstellation(ctx, words, w, h, isPortrait) {
     ctx.arc(p.x, p.y, glowR, 0, Math.PI * 2);
     ctx.fill();
 
-    // Core circle
     ctx.beginPath();
     ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
     ctx.fillStyle   = '#050510';
