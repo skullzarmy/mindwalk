@@ -65,6 +65,7 @@ export default function App() {
   // Synthesis state
   const [isSynthesizing,  setIsSynthesizing]  = useState(false);
   const [synthesisResult, setSynthesisResult] = useState(null);
+  const [synthesisPath,   setSynthesisPath]   = useState([]);
 
   // Passphrase unlock modal — shown when an encrypted key exists but has not yet
   // been decrypted for this session.
@@ -245,6 +246,7 @@ export default function App() {
   const startSynthesis = useCallback(async (path) => {
     if (path.length === 0) return;
     setIsSynthesizing(true);
+    setSynthesisPath(path);
     setError(null);
 
     try {
@@ -334,6 +336,7 @@ export default function App() {
     setLastWord(null);
     setError(null);
     setSynthesisResult(null);
+    setSynthesisPath([]);
     setIsSynthesizing(false);
   }, []);
 
@@ -539,7 +542,7 @@ export default function App() {
       {synthesisResult && (
         <SynthesisOverlay 
           result={synthesisResult} 
-          wordPath={wordPath}
+          wordPath={synthesisPath}
           onContinue={() => {
             setSynthesisResult(null);
             setIsSynthesizing(false);
