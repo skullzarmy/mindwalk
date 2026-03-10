@@ -2,13 +2,38 @@ import React, { useRef, useState, useEffect } from 'react';
 import { generateShareImage } from '../utils/generateShareImage.js';
 
 // ── Custom Share Modal UI ───────────────────────────────────────────────────
+const TWITTER_URL = 'https://mindwalk.joepeterson.work';
+const TWITTER_URL_COST = 23; // t.co shortens every URL to 23 chars
+const TWITTER_LIMIT = 280;
+const MAX_CONSTELLATION_CHARS = 50;
+
+/**
+ * Builds share text that stays within Twitter's 280-character limit.
+ * Twitter shortens all URLs to 23 chars (t.co), so the effective URL cost
+ * is fixed regardless of actual URL length.
+ */
+function buildShareText(constellation, message) {
+  const name = constellation.length > MAX_CONSTELLATION_CHARS
+    ? constellation.substring(0, MAX_CONSTELLATION_CHARS - 3) + '...'
+    : constellation;
+  const intro = `I discovered the ${name} Constellation on MindWalk!\n\n`;
+  const suffix = `\n\n#MindWalk\n\n`;
+  // Fixed char cost: intro + opening quote + closing quote + suffix + URL cost
+  const fixed = intro.length + 1 + 1 + suffix.length + TWITTER_URL_COST;
+  const maxMsg = Math.max(0, TWITTER_LIMIT - fixed);
+  const msg = message.length > maxMsg
+    ? message.substring(0, maxMsg - 3) + '...'
+    : message;
+  return `${intro}"${msg}"${suffix}${TWITTER_URL}`;
+}
+
 function ShareModal({ onClose, result, wordPath }) {
   const [format, setFormat] = useState('portrait');
   const [images, setImages] = useState({ portrait: null, landscape: null });
   const [isGenerating, setIsGenerating] = useState(true);
   const [error, setError] = useState(null);
 
-  const shareText = `I discovered the ${result.constellation} Constellation on MindWalk!\n\n"${result.message}"\n\n#MindWalk`;
+  const shareText = buildShareText(result.constellation, result.message);
 
   /**
    * Concurrently generates both portrait and landscape formats client-side
@@ -49,7 +74,7 @@ function ShareModal({ onClose, result, wordPath }) {
   };
 
   const handleX = () => {
-    const text = encodeURIComponent(shareText + '\n\nhttps://mindwalk.joepeterson.work');
+    const text = encodeURIComponent(shareText);
     window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank');
   };
 

@@ -139,7 +139,7 @@ Analyze this chronological evolution of thoughts. What is the overarching narrat
 You MUST respond in EXACTLY the following format, with no extra text or markdown:
 
 CONSTELLATION: <A striking, beautiful 2-4 word name for this specific pattern of thoughts, like "The Constellation of Anxious Clarity" or "The Architecture of Patience">
-MESSAGE: <A profound, thoughtful 2-sentence realization about how these specific concepts weave together into a greater truth.>`;
+MESSAGE: <1 punchy, profound sentence about how these concepts connect. Under 120 characters MAX so it fits in a single Tweet easily.>`;
 
   const messages = [
     { role: 'system', content: systemPrompt },
@@ -180,7 +180,10 @@ MESSAGE: <A profound, thoughtful 2-sentence realization about how these specific
   const msgMatch = content.match(/MESSAGE:\s*([\s\S]+)/i);
 
   if (constMatch) constellation = constMatch[1].trim();
-  if (msgMatch) message = msgMatch[1].trim();
+  if (msgMatch) {
+    message = msgMatch[1].trim();
+    if (message.length > 120) message = message.substring(0, 117) + '...';
+  }
 
   return { constellation, message };
 }
