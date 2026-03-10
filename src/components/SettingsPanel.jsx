@@ -42,12 +42,13 @@ export default function SettingsPanel({
   const [useCustomModel,  setUseCustomModel]  = useState(false);
   const headingId = 'settings-panel-title';
 
-  // Re-read settings each time panel opens
+  // Re-read settings each time panel opens; reset transient UI state on close
   useEffect(() => {
     if (isOpen) {
       setSettings({ ...getSettings(), apiKey: getApiKey() });
       setSaveError('');
       setPassphrase('');
+      setConfirmClear(false);
       // Detect current storage mode
       hasEncryptedKey().then(has => setStorageMode(has ? 'encrypted' : 'session'));
       // Check whether the server has its own API key configured
@@ -58,6 +59,8 @@ export default function SettingsPanel({
           console.error('[SettingsPanel] Could not fetch /api/config:', err);
           setServerHasKey(false);
         });
+    } else {
+      setConfirmClear(false);
     }
   }, [isOpen]);
 
