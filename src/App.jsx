@@ -20,6 +20,9 @@ const DEFAULT_TEMPLATE =
 // Number of past AI responses to blend into the word cloud for a stream-of-thought effect
 const STREAM_DEPTH = 5;
 
+// Number of words in each synthesis window; synthesis always uses the most recent N words
+const SYNTHESIS_WINDOW = 10;
+
 // Media query that matches the same mobile breakpoint used in main.css
 const MOBILE_MQ = '(max-width: 768px)';
 
@@ -62,6 +65,7 @@ export default function App() {
   // Synthesis state
   const [isSynthesizing,  setIsSynthesizing]  = useState(false);
   const [synthesisResult, setSynthesisResult] = useState(null);
+  const [synthesisPath,   setSynthesisPath]   = useState([]);
 
   // Passphrase unlock modal — shown when an encrypted key exists but has not yet
   // been decrypted for this session.
@@ -242,6 +246,7 @@ export default function App() {
   const startSynthesis = useCallback(async (path) => {
     if (path.length === 0) return;
     setIsSynthesizing(true);
+    setSynthesisPath(path);
     setError(null);
 
     try {
@@ -280,9 +285,9 @@ export default function App() {
     const pathStr = newPath.join(' → ');
     setLastWord(word);
 
-    // EXACTLY 10 WORDS: Auto-trigger synthesis
-    if (newPath.length === 10) {
-      startSynthesis(newPath);
+    // Every SYNTHESIS_WINDOW words: Auto-trigger synthesis on the most recent window
+    if (newPath.length >= SYNTHESIS_WINDOW && newPath.length % SYNTHESIS_WINDOW === 0) {
+      startSynthesis(newPath.slice(-SYNTHESIS_WINDOW));
       return;
     }
 
@@ -299,8 +304,9 @@ export default function App() {
   }, [promptTemplate, sendMessage, synthesisResult, startSynthesis]);
 
   const handleSynthesizeEarly = useCallback(() => {
-    if (wordPathRef.current.length >= 5) {
-      startSynthesis(wordPathRef.current);
+    const path = wordPathRef.current;
+    if (path.length >= 5) {
+      startSynthesis(path.slice(-SYNTHESIS_WINDOW));
     }
   }, [startSynthesis]);
 
@@ -330,6 +336,7 @@ export default function App() {
     setLastWord(null);
     setError(null);
     setSynthesisResult(null);
+    setSynthesisPath([]);
     setIsSynthesizing(false);
   }, []);
 
@@ -535,7 +542,7 @@ export default function App() {
       {synthesisResult && (
         <SynthesisOverlay 
           result={synthesisResult} 
-          wordPath={wordPath}
+          wordPath={synthesisPath}
           onContinue={() => {
             setSynthesisResult(null);
             setIsSynthesizing(false);

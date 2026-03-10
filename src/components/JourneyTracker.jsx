@@ -9,11 +9,11 @@ export default function JourneyTracker({ wordPath, maxWords = 10, onSynthesizeEa
   const canSynthesize = currentCount >= 5;
 
   return (
-    <div className="journey-tracker-hud" aria-label={`Journey progress: ${currentCount} of ${maxWords}`}>
+    <div className="journey-tracker-hud" aria-label={`Journey progress: ${currentCount} word${currentCount !== 1 ? 's' : ''} explored`}>
       <div className="journey-stars">
         {Array.from({ length: maxWords }).map((_, i) => {
-          const isFilled = i < currentCount;
-          const isJustFilled = i === currentCount - 1 && currentCount > 0;
+          const isFilled = i < Math.min(currentCount, maxWords);
+          const isJustFilled = currentCount > 0 && i === (currentCount - 1) % maxWords;
           
           return (
             <div 
@@ -27,12 +27,12 @@ export default function JourneyTracker({ wordPath, maxWords = 10, onSynthesizeEa
         })}
       </div>
       
-      {canSynthesize && currentCount < maxWords && (
+      {canSynthesize && (
         <button 
           className="synthesize-early-btn"
           onClick={onSynthesizeEarly}
           disabled={isLoading}
-          aria-label="Synthesize journey early"
+          aria-label="Synthesize journey"
         >
           {isLoading ? 'Synthesizing...' : 'SYNTHESIZE JOURNEY ✨'}
         </button>
