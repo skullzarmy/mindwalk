@@ -20,13 +20,13 @@ const PORT = process.env.PORT || 3001;
 // same request/response shape; anthropic, google, and cloudflare are normalised
 // server-side so the frontend always receives the OpenAI response envelope.
 const PROVIDER_DEFAULTS = {
-  openai:       { baseUrl: 'https://api.openai.com/v1',                           model: 'gpt-3.5-turbo',                  keyVar: 'OPENAI_API_KEY',       modelVar: 'OPENAI_MODEL' },
-  anthropic:    { baseUrl: 'https://api.anthropic.com/v1',                        model: 'claude-haiku-4-5',               keyVar: 'ANTHROPIC_API_KEY',    modelVar: 'ANTHROPIC_MODEL' },
-  google:       { baseUrl: 'https://generativelanguage.googleapis.com/v1beta',    model: 'gemini-1.5-flash',               keyVar: 'GOOGLE_API_KEY',       modelVar: 'GOOGLE_MODEL' },
-  xai:          { baseUrl: 'https://api.x.ai/v1',                                 model: 'grok-3-mini',                    keyVar: 'XAI_API_KEY',          modelVar: 'XAI_MODEL' },
-  digitalocean: { baseUrl: '',                                                     model: 'n8n-meta-llama-3-1-70b-instruct',keyVar: 'DIGITALOCEAN_API_KEY', modelVar: 'DIGITALOCEAN_MODEL' },
-  cloudflare:   { baseUrl: '',                                                     model: '@cf/meta/llama-3.1-8b-instruct', keyVar: 'CLOUDFLARE_API_KEY',   modelVar: 'CLOUDFLARE_MODEL' },
-  openrouter:   { baseUrl: 'https://openrouter.ai/api/v1',                        model: 'openai/gpt-3.5-turbo',           keyVar: 'OPENROUTER_API_KEY',   modelVar: 'OPENROUTER_MODEL' },
+  openai:       { baseUrl: 'https://api.openai.com/v1',                           model: 'gpt-4o-mini',                          keyVar: 'OPENAI_API_KEY',       modelVar: 'OPENAI_MODEL' },
+  anthropic:    { baseUrl: 'https://api.anthropic.com/v1',                        model: 'claude-haiku-4-5',                     keyVar: 'ANTHROPIC_API_KEY',    modelVar: 'ANTHROPIC_MODEL' },
+  google:       { baseUrl: 'https://generativelanguage.googleapis.com/v1beta',    model: 'gemini-flash-lite-latest',             keyVar: 'GOOGLE_API_KEY',       modelVar: 'GOOGLE_MODEL' },
+  xai:          { baseUrl: 'https://api.x.ai/v1',                                 model: 'grok-3-mini-latest',                   keyVar: 'XAI_API_KEY',          modelVar: 'XAI_MODEL' },
+  digitalocean: { baseUrl: '',                                                     model: 'deepseek-r1-distill-llama-70b',        keyVar: 'DIGITALOCEAN_API_KEY', modelVar: 'DIGITALOCEAN_MODEL' },
+  cloudflare:   { baseUrl: '',                                                     model: '@cf/meta/llama-4-scout-17b-16e-instruct', keyVar: 'CLOUDFLARE_API_KEY',   modelVar: 'CLOUDFLARE_MODEL' },
+  openrouter:   { baseUrl: 'https://openrouter.ai/api/v1',                        model: 'meta-llama/llama-4-maverick:free',     keyVar: 'OPENROUTER_API_KEY',   modelVar: 'OPENROUTER_MODEL' },
 };
 
 // Placeholder values that indicate a key has not been filled in

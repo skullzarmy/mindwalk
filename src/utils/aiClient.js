@@ -101,7 +101,7 @@ export async function callAIClient(messages) {
   const { provider, model, maxTokens } = getSettings();
   const apiKey        = getApiKey();
   const baseUrl       = PROVIDER_URLS[provider];
-  const resolvedModel = model || { openai: 'gpt-3.5-turbo', anthropic: 'claude-haiku-4-5', google: 'gemini-2.0-flash', xai: 'grok-3-mini', openrouter: 'openai/gpt-3.5-turbo', 'cloudflare-workers': '@cf/meta/llama-3.1-8b-instruct', cloudflare: '@cf/meta/llama-3.1-8b-instruct' }[provider] || 'gpt-3.5-turbo';
+  const resolvedModel = model || { openai: 'gpt-4o-mini', anthropic: 'claude-haiku-4-5', google: 'gemini-flash-lite-latest', xai: 'grok-3-mini-latest', openrouter: 'meta-llama/llama-4-maverick:free', 'cloudflare-workers': '@cf/meta/llama-4-scout-17b-16e-instruct', cloudflare: '@cf/meta/llama-4-scout-17b-16e-instruct' }[provider] || 'gpt-4o-mini';
   const resolvedMax   = maxTokens || 150;
 
   switch (provider) {
@@ -128,7 +128,7 @@ export async function callSynthesisClient(wordPath) {
   const { provider, model } = getSettings();
   const apiKey        = getApiKey();
   const baseUrl       = PROVIDER_URLS[provider];
-  const resolvedModel = model || { openai: 'gpt-3.5-turbo', anthropic: 'claude-haiku-4-5', google: 'gemini-2.0-flash', xai: 'grok-3-mini', openrouter: 'openai/gpt-3.5-turbo', 'cloudflare-workers': '@cf/meta/llama-3.1-8b-instruct', cloudflare: '@cf/meta/llama-3.1-8b-instruct' }[provider] || 'gpt-3.5-turbo';
+  const resolvedModel = model || { openai: 'gpt-4o-mini', anthropic: 'claude-haiku-4-5', google: 'gemini-flash-lite-latest', xai: 'grok-3-mini-latest', openrouter: 'meta-llama/llama-4-maverick:free', 'cloudflare-workers': '@cf/meta/llama-4-scout-17b-16e-instruct', cloudflare: '@cf/meta/llama-4-scout-17b-16e-instruct' }[provider] || 'gpt-4o-mini';
   const resolvedMax   = 300; // Need more tokens for synthesis
 
   const systemPrompt = `You are "The Weaver", observing a user's mind walk journey.

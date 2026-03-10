@@ -7,13 +7,13 @@
 const STORAGE_KEY = 'mindwalk_ai_settings';
 
 export const SUPPORTED_PROVIDERS = [
-  { id: 'openai',     label: 'OpenAI',          defaultModel: 'gpt-3.5-turbo',         keyPlaceholder: 'sk-...' },
-  { id: 'anthropic',  label: 'Anthropic Claude', defaultModel: 'claude-haiku-4-5',      keyPlaceholder: 'sk-ant-...' },
-  { id: 'google',     label: 'Google Gemini',    defaultModel: 'gemini-2.0-flash',      keyPlaceholder: 'AIza...' },
-  { id: 'xai',        label: 'xAI / Grok',       defaultModel: 'grok-3-mini',           keyPlaceholder: 'xai-...' },
-  { id: 'openrouter',         label: 'OpenRouter',              defaultModel: 'openai/gpt-3.5-turbo',            keyPlaceholder: 'sk-or-...' },
-  { id: 'cloudflare-workers', label: 'Cloudflare Workers AI',   defaultModel: '@cf/meta/llama-3.1-8b-instruct', keyPlaceholder: 'accountId:apiToken' },
-  { id: 'cloudflare',         label: 'Cloudflare AI Gateway',   defaultModel: '@cf/meta/llama-3.1-8b-instruct', keyPlaceholder: 'accountId:gatewayId:apiToken' },
+  { id: 'openai',     label: 'OpenAI',          defaultModel: 'gpt-4o-mini',                        keyPlaceholder: 'sk-...' },
+  { id: 'anthropic',  label: 'Anthropic Claude', defaultModel: 'claude-haiku-4-5',                  keyPlaceholder: 'sk-ant-...' },
+  { id: 'google',     label: 'Google Gemini',    defaultModel: 'gemini-flash-lite-latest',           keyPlaceholder: 'AIza...' },
+  { id: 'xai',        label: 'xAI / Grok',       defaultModel: 'grok-3-mini-latest',                keyPlaceholder: 'xai-...' },
+  { id: 'openrouter',         label: 'OpenRouter',              defaultModel: 'meta-llama/llama-4-maverick:free',        keyPlaceholder: 'sk-or-...' },
+  { id: 'cloudflare-workers', label: 'Cloudflare Workers AI',   defaultModel: '@cf/meta/llama-4-scout-17b-16e-instruct', keyPlaceholder: 'accountId:apiToken' },
+  { id: 'cloudflare',         label: 'Cloudflare AI Gateway',   defaultModel: '@cf/meta/llama-4-scout-17b-16e-instruct', keyPlaceholder: 'accountId:gatewayId:apiToken' },
 ];
 
 const DEFAULT_SETTINGS = {
