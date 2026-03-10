@@ -6,6 +6,7 @@ function ShareModal({ onClose, result, wordPath }) {
   const [format, setFormat] = useState('portrait');
   const [images, setImages] = useState({ portrait: null, landscape: null });
   const [isGenerating, setIsGenerating] = useState(true);
+  const [error, setError] = useState(null);
 
   const shareText = `I discovered the ${result.constellation} Constellation on MindWalk!\n\n"${result.message}"\n\n#MindWalk`;
 
@@ -15,6 +16,7 @@ function ShareModal({ onClose, result, wordPath }) {
    */
   const generateBothFormats = async () => {
     setIsGenerating(true);
+    setError(null);
 
     try {
       const [portraitUrl, landscapeUrl] = await Promise.all([
@@ -26,6 +28,7 @@ function ShareModal({ onClose, result, wordPath }) {
 
     } catch (err) {
       console.error("Image generation failed:", err.message || err);
+      setError(err.message || 'Image generation failed. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -76,6 +79,11 @@ function ShareModal({ onClose, result, wordPath }) {
         <div className="share-preview-wrapper" style={{ aspectRatio: format === 'portrait' ? '9/16' : '16/9' }}>
           {isGenerating ? (
             <div className="preview-loading">Forging Constellations...</div>
+          ) : error ? (
+            <div className="preview-error">
+              <span className="preview-error-icon">⚠️</span>
+              <span>{error}</span>
+            </div>
           ) : (
             <img src={currentImage} alt="Journey Card Draft" className="share-preview-img" />
           )}
@@ -84,10 +92,10 @@ function ShareModal({ onClose, result, wordPath }) {
         <p className="share-hint">Your structural constellation and greater message have been captured perfectly.</p>
         
         <div className="share-modal-actions">
-          <button className="sm-btn download" onClick={handleDownload} disabled={isGenerating}>
+          <button className="sm-btn download" onClick={handleDownload} disabled={isGenerating || !!error}>
             <span className="icon">⬇</span> Download Image
           </button>
-          <button className="sm-btn x-twitter" onClick={handleX} disabled={isGenerating}>
+          <button className="sm-btn x-twitter" onClick={handleX} disabled={isGenerating || !!error}>
             <span className="icon">𝕏</span> Share on X
           </button>
         </div>

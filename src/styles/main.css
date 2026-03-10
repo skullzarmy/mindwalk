@@ -22,6 +22,7 @@
   --cyan:       #00ffff;
   --purple:     #c084fc;
   --blue:       #60a5fa;
+  --error:      #f87171;
   --dark:       #050510;
   --panel-bg:   rgba(5, 5, 22, 0.93);
   --border:     rgba(0, 255, 255, 0.18);
@@ -39,6 +40,7 @@
     --cyan:       #006b8f;   /* darker cyan — 7:1 on light bg */
     --purple:     #6b21c8;   /* darker purple — 7:1 on light bg */
     --blue:       #1a4ecf;   /* darker blue — 7:1 on light bg */
+    --error:      #b91c1c;   /* darker red — 7:1 on light bg */
     --dark:       #eef2f7;   /* light background */
     --panel-bg:   rgba(238, 242, 250, 0.97);
     --border:     rgba(0, 107, 143, 0.35);
@@ -1978,4 +1980,22 @@ html, body, #root {
   font-size: 0.9rem;
   letter-spacing: 0.1em;
   animation: pulse-glow 1.5s infinite alternate;
+}
+
+.preview-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 100%;
+  padding: 1rem;
+  color: var(--error);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.preview-error-icon {
+  font-size: 1.5rem;
 }
