@@ -34,6 +34,7 @@ export default function SettingsPanel({
   const [saveError,     setSaveError]     = useState('');
   const [isSaving,      setIsSaving]      = useState(false);
   const [serverHasKey,  setServerHasKey]  = useState(false);
+  const [confirmClear,  setConfirmClear]  = useState(false);
   // Model fetch state
   const [availableModels, setAvailableModels] = useState([]);
   const [modelsLoading,   setModelsLoading]   = useState(false);
@@ -104,16 +105,19 @@ export default function SettingsPanel({
     }
   };
 
-  const handleClear = async () => {
-    if (window.confirm('Remove your saved API key and settings?')) {
-      clearSettings();
-      clearApiKey();
-      clearSessionKey();
-      await clearEncryptedKey();
-      setSettings({ ...getSettings(), apiKey: '' });
-      setPassphrase('');
-      setStorageMode('session');
-    }
+  const handleClear = () => {
+    setConfirmClear(true);
+  };
+
+  const handleConfirmClear = async () => {
+    setConfirmClear(false);
+    clearSettings();
+    clearApiKey();
+    clearSessionKey();
+    await clearEncryptedKey();
+    setSettings({ ...getSettings(), apiKey: '' });
+    setPassphrase('');
+    setStorageMode('session');
   };
 
   const handleFetchModels = async (providerOverride, keyOverride) => {
@@ -198,15 +202,12 @@ export default function SettingsPanel({
                   <button
                     key={p.id}
                     className={`provider-btn${settings.provider === p.id ? ' selected' : ''}`}
-                    onClick={() => handleProviderChange(p.id)}
+                    onClick={() => { handleProviderChange(p.id); setStep(2); }}
                   >
                     {p.label}
                   </button>
                 ))}
               </div>
-              <button className="save-btn wizard-next-btn" onClick={() => setStep(2)}>
-                NEXT →
-              </button>
             </div>
           )}
 
@@ -693,9 +694,19 @@ export default function SettingsPanel({
         </div>
 
         {settings.apiKey && (
-          <button className="settings-clear-btn" onClick={handleClear} disabled={isSaving}>
-            CLEAR SAVED KEY
-          </button>
+          confirmClear ? (
+            <div className="inline-confirm">
+              <p className="inline-confirm-msg">Remove your saved API key and settings?</p>
+              <div className="inline-confirm-actions">
+                <button className="save-btn inline-confirm-danger-btn" onClick={handleConfirmClear}>YES, CLEAR</button>
+                <button className="cancel-btn" onClick={() => setConfirmClear(false)}>CANCEL</button>
+              </div>
+            </div>
+          ) : (
+            <button className="settings-clear-btn" onClick={handleClear} disabled={isSaving}>
+              CLEAR SAVED KEY
+            </button>
+          )
         )}
 
       </div>
