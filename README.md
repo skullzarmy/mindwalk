@@ -12,9 +12,20 @@ powered by your choice of AI provider.
   that evolves as the session progresses.
 * **Click any word** → triggers a configurable *"ponder"* prompt and regenerates
   the cloud from the next AI response.
-* A **sliding chat panel** (left) shows the full conversation history.
-* A **prompt editor panel** (right) lets you edit and save the ponder-prompt
-  template (`{WORD}` is replaced with the clicked word).
+* **Journey Tracker HUD** — a 10-star progress bar tracks how far into your
+  walk you are.  Once you've clicked 5 words you can trigger **Synthesis**
+  early; at exactly 10 words it fires automatically.
+* **Journey Synthesis** — "The Weaver" AI analyses your complete word path and
+  names the hidden pattern as a *Constellation* (e.g. "The Architecture of
+  Patience"), plus a one-sentence philosophical insight.
+* **Share Journey** — after synthesis, generate a portrait (9:16) or landscape
+  (16:9) shareable image and download it or post it to X (Twitter).
+* A **sliding chat panel** shows the full conversation history.
+* A **journey panel** shows your current word path, lets you save/export/import
+  walks, and supports **branching** (click any prior step to fork from there).
+* A **settings panel** includes the ponder-prompt template editor, colorblind
+  mode, path visualisation options, and the full BYOK key manager (with live
+  model fetching for supported providers).
 * A manual text input at the bottom lets you start or redirect the conversation
   at any time.
 
@@ -132,22 +143,22 @@ are included for one-click Netlify deployment.
 | `AI_MAX_TOKENS` | `150` | Maximum tokens per AI response |
 | `TOKEN_QUOTA_PER_HOUR` | `10000` | Hourly token budget per IP |
 | `OPENAI_API_KEY` | — | OpenAI key |
-| `OPENAI_MODEL` | `gpt-3.5-turbo` | OpenAI model override |
+| `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI model override |
 | `ANTHROPIC_API_KEY` | — | Anthropic key |
 | `ANTHROPIC_MODEL` | `claude-haiku-4-5` | Anthropic model override |
 | `GOOGLE_API_KEY` | — | Google Gemini key |
-| `GOOGLE_MODEL` | `gemini-1.5-flash` | Google model override |
+| `GOOGLE_MODEL` | `gemini-flash-lite-latest` | Google model override |
 | `XAI_API_KEY` | — | xAI / Grok key |
-| `XAI_MODEL` | `grok-3-mini` | xAI model override |
+| `XAI_MODEL` | `grok-3-mini-latest` | xAI model override |
 | `DIGITALOCEAN_API_KEY` | — | DigitalOcean GenAI key |
 | `DIGITALOCEAN_BASE_URL` | — | DigitalOcean agent endpoint URL (**required** for this provider) |
-| `DIGITALOCEAN_MODEL` | `n8n-meta-llama-3-1-70b-instruct` | DigitalOcean model override |
+| `DIGITALOCEAN_MODEL` | `deepseek-r1-distill-llama-70b` | DigitalOcean model override |
 | `CLOUDFLARE_API_KEY` | — | Cloudflare API token |
 | `CLOUDFLARE_ACCOUNT_ID` | — | Cloudflare account ID |
 | `CLOUDFLARE_GATEWAY_ID` | — | Optional: Cloudflare AI Gateway ID |
-| `CLOUDFLARE_MODEL` | `@cf/meta/llama-3.1-8b-instruct` | Cloudflare model override |
+| `CLOUDFLARE_MODEL` | `@cf/meta/llama-4-scout-17b-16e-instruct` | Cloudflare model override |
 | `OPENROUTER_API_KEY` | — | OpenRouter key |
-| `OPENROUTER_MODEL` | `openai/gpt-3.5-turbo` | OpenRouter model override |
+| `OPENROUTER_MODEL` | `meta-llama/llama-4-maverick:free` | OpenRouter model override |
 
 > **BYOK-only mode:** Leave all provider keys unset and the server starts
 > without an API key.  Users are guided through a 3-step in-browser wizard to
@@ -163,18 +174,22 @@ The server auto-detects which provider to use from whichever key is set in
 
 | `AI_PROVIDER` value | Provider | Key env var | Default model |
 |---|---|---|---|
-| `openai` | [OpenAI](https://platform.openai.com/api-keys) | `OPENAI_API_KEY` | `gpt-3.5-turbo` |
+| `openai` | [OpenAI](https://platform.openai.com/api-keys) | `OPENAI_API_KEY` | `gpt-4o-mini` |
 | `anthropic` | [Anthropic](https://console.anthropic.com/) | `ANTHROPIC_API_KEY` | `claude-haiku-4-5` |
-| `google` | [Google Gemini](https://aistudio.google.com/app/apikey) | `GOOGLE_API_KEY` | `gemini-1.5-flash` |
-| `xai` | [xAI / Grok](https://console.x.ai/) | `XAI_API_KEY` | `grok-3-mini` |
-| `digitalocean` | [DigitalOcean GenAI](https://cloud.digitalocean.com/gen-ai) | `DIGITALOCEAN_API_KEY` | configurable |
-| `cloudflare` | [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/) / [AI Gateway](https://developers.cloudflare.com/ai-gateway/usage/chat-completion/) | `CLOUDFLARE_API_KEY` | `@cf/meta/llama-3.1-8b-instruct` |
+| `google` | [Google Gemini](https://aistudio.google.com/app/apikey) | `GOOGLE_API_KEY` | `gemini-flash-lite-latest` |
+| `xai` | [xAI / Grok](https://console.x.ai/) | `XAI_API_KEY` | `grok-3-mini-latest` |
+| `digitalocean` | [DigitalOcean GenAI](https://cloud.digitalocean.com/gen-ai) | `DIGITALOCEAN_API_KEY` | `deepseek-r1-distill-llama-70b` |
+| `cloudflare` | [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/) / [AI Gateway](https://developers.cloudflare.com/ai-gateway/usage/chat-completion/) | `CLOUDFLARE_API_KEY` | `@cf/meta/llama-4-scout-17b-16e-instruct` |
+| `openrouter` | [OpenRouter](https://openrouter.ai/keys) (unified billing) | `OPENROUTER_API_KEY` | `meta-llama/llama-4-maverick:free` |
 
 > **Cloudflare AI Gateway**: set `CLOUDFLARE_GATEWAY_ID` to route requests through the AI Gateway (`gateway.ai.cloudflare.com`) instead of the direct Workers AI REST API. The Gateway provides an OpenAI-compatible chat completions interface with built-in caching, rate limiting, and analytics.
-| `openrouter` | [OpenRouter](https://openrouter.ai/keys) (unified billing) | `OPENROUTER_API_KEY` | `openai/gpt-3.5-turbo` |
 
 Override the model with the corresponding `*_MODEL` env var (e.g.
 `ANTHROPIC_MODEL=claude-opus-4-5`).
+
+> **DigitalOcean** is a server-only provider — it is not available in BYOK
+> (browser-direct) mode and requires `DIGITALOCEAN_BASE_URL` pointing at your
+> GenAI agent endpoint.
 
 ### Token budget
 
@@ -189,6 +204,7 @@ concise.  Override with `AI_MAX_TOKENS=<number>` in `.env`.
 | 3D rendering | Three.js (sprites, OrbitControls, AdditiveBlending) |
 | Backend | Express.js (AI provider proxy, keeps API keys server-side) |
 | Styling | CSS custom properties, cyberpunk/space game aesthetic |
+| Share images | Client-side Canvas 2D API (`generateShareImage.js`) |
 
 ## Controls
 
@@ -197,9 +213,32 @@ concise.  Override with `AI_MAX_TOKENS=<number>` in `.env`.
 | **Click word** | Ponder that word (sends prompt to AI) |
 | **Drag** | Orbit the word cloud |
 | **Scroll** | Zoom in / out |
-| **⚙ PROMPT** | Edit the ponder-prompt template |
+| **🧠 MINDWALK** | Toggle the welcome / about panel |
 | **💬 CHAT** | View full conversation history |
+| **🗺 JOURNEY** | Manage current path, save, export, import, or branch |
+| **⚙ SETTINGS** | Edit ponder-prompt template, manage BYOK key, toggle colorblind mode, path style |
 | **Type + EXPLORE** | Send a freeform thought |
+| **★ stars (HUD)** | Shows progress toward Journey Synthesis (10 words) |
+| **SYNTHESIZE JOURNEY ✨** | Trigger synthesis early (available after 5+ words) |
+
+## Journey Synthesis
+
+After exploring **10 concepts** (or tapping **SYNTHESIZE JOURNEY ✨** at 5+),
+MindWalk activates "The Weaver" — a special AI prompt that analyses the entire
+word path, identifies the overarching narrative, and returns:
+
+* **Constellation name** — a striking 2–4 word label for the thought pattern
+  (e.g. "The Architecture of Patience").
+* **Philosophical insight** — a single punchy sentence about how the concepts
+  weave together.
+
+### Sharing your journey
+
+After synthesis a share dialog lets you:
+
+* Toggle between **Stories (9:16)** and **Poster (16:9)** image formats.
+* **Download** the card as a PNG.
+* **Share on X** (Twitter) with a pre-filled caption.
 
 ## Rate limiting
 
@@ -210,6 +249,7 @@ MindWalk's server enforces layered rate limits to prevent abuse and control AI A
 | Endpoint | Window | Limit | Who it protects |
 |---|---|---|---|
 | `POST /api/chat` (server key) | 15 min | **20 requests** | Server API budget |
+| `POST /api/synthesize` (server key) | 15 min | **20 requests** (shared with `/api/chat`) | Server API budget |
 | `POST /api/chat` (BYOK¹) | 15 min | **50 requests** | Fair-use for self-funded calls |
 | `GET /api/config` | 15 min | 100 requests | Config polling |
 | SPA static fallback | 1 min | 200 requests | File-system flooding |
@@ -288,6 +328,28 @@ Every response sets:
 
 CSP prevents injected scripts from exfiltrating keys even if an XSS
 vulnerability exists somewhere in the dependency tree.
+
+### BYOK-supported providers
+
+In BYOK mode the browser calls the AI provider directly (the key never touches
+the server).  The following providers are supported:
+
+| Provider | Key format |
+|---|---|
+| OpenAI | `sk-…` |
+| Anthropic Claude | `sk-ant-…` |
+| Google Gemini | `AIza…` |
+| xAI / Grok | `xai-…` |
+| OpenRouter | `sk-or-…` |
+| Cloudflare Workers AI | `accountId:apiToken` |
+| Cloudflare AI Gateway | `accountId:gatewayId:apiToken` |
+
+> **DigitalOcean GenAI** is a server-only provider and is not available in
+> BYOK mode.
+
+For providers that expose a `/models` endpoint (OpenAI, Anthropic, Google,
+xAI, OpenRouter, Cloudflare Workers AI), the Settings panel can **fetch the
+live model list** so you can pick any model available to your key.
 
 ### Key storage options (client)
 
