@@ -55,7 +55,7 @@ async function callOpenAICompatible(provider, messages, maxTokens) {
   let baseUrl = cfg.baseUrl;
   if (provider === 'digitalocean') {
     baseUrl = process.env.DIGITALOCEAN_BASE_URL || '';
-    if (!baseUrl) throw new Error('DigitalOcean provider is not properly configured.');
+    if (!baseUrl) throw new Error('DigitalOcean provider misconfiguration: required env var DIGITALOCEAN_BASE_URL is missing or empty.');
   }
 
   const response = await fetch(`${baseUrl}/chat/completions`, {
@@ -127,7 +127,7 @@ async function callCloudflare(messages, maxTokens) {
   const cfg = PROVIDER_DEFAULTS.cloudflare;
   const apiKey = process.env[cfg.keyVar];
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-  if (!accountId) throw new Error('Cloudflare provider is not properly configured.');
+  if (!accountId) throw new Error('Cloudflare provider is not properly configured: missing CLOUDFLARE_ACCOUNT_ID environment variable.');
   const model = process.env[cfg.modelVar] || cfg.model;
   const gatewayId = process.env.CLOUDFLARE_GATEWAY_ID;
 
@@ -391,7 +391,11 @@ app.post('/api/chat', adaptiveChatLimiter, validateChatRequest, async (req, res)
     res.json(data);
   } catch (err) {
     console.error('[/api/chat] AI call failed:', err);
-    res.status(500).json({ error: 'AI service error. Please try again.' });
+    const errorResponse = { error: 'AI service error. Please try again.', code: 'AI_PROVIDER_ERROR' };
+    if (process.env.NODE_ENV !== 'production') {
+      errorResponse.details = { message: err?.message || 'Unknown error', provider };
+    }
+    res.status(500).json(errorResponse);
   }
 });
 
@@ -459,7 +463,11 @@ MESSAGE: <1 punchy, profound sentence about how these concepts connect. Under 15
     res.json({ constellation, message });
   } catch (err) {
     console.error('[/api/synthesize] AI call failed:', err);
-    res.status(500).json({ error: 'AI service error. Please try again.' });
+    const errorResponse = { error: 'AI service error. Please try again.', code: 'AI_PROVIDER_ERROR' };
+    if (process.env.NODE_ENV !== 'production') {
+      errorResponse.details = { message: err?.message || 'Unknown error', provider };
+    }
+    res.status(500).json(errorResponse);
   }
 });
 
