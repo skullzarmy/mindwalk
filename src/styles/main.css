@@ -1114,6 +1114,33 @@ html, body, #root {
   gap: 8px;
 }
 
+/* ── Inline confirm dialog (replaces window.confirm) ─────────────────────── */
+.inline-confirm {
+  margin-top: 10px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 80, 80, 0.45);
+  border-radius: 4px;
+  background: rgba(255, 50, 50, 0.07);
+}
+.inline-confirm-msg {
+  font-size: 0.80rem;
+  color: #ff9999;
+  line-height: 1.55;
+  margin: 0 0 10px;
+}
+.inline-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+.inline-confirm-danger-btn {
+  background: rgba(200, 40, 40, 0.85) !important;
+  border-color: rgba(255, 80, 80, 0.7) !important;
+  color: #fff !important;
+}
+.inline-confirm-danger-btn:hover {
+  background: rgba(220, 50, 50, 0.95) !important;
+}
+
 /* ── Resume saved-walks list ─────────────────────────────────────────────── */
 .resume-list {
   display: flex;

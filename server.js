@@ -55,7 +55,7 @@ async function callOpenAICompatible(provider, messages, maxTokens) {
   let baseUrl = cfg.baseUrl;
   if (provider === 'digitalocean') {
     baseUrl = process.env.DIGITALOCEAN_BASE_URL || '';
-    if (!baseUrl) throw new Error('DIGITALOCEAN_BASE_URL is required for the digitalocean provider');
+    if (!baseUrl) throw new Error('DigitalOcean provider is not properly configured.');
   }
 
   const response = await fetch(`${baseUrl}/chat/completions`, {
@@ -127,7 +127,7 @@ async function callCloudflare(messages, maxTokens) {
   const cfg = PROVIDER_DEFAULTS.cloudflare;
   const apiKey = process.env[cfg.keyVar];
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-  if (!accountId) throw new Error('CLOUDFLARE_ACCOUNT_ID is required for the cloudflare provider');
+  if (!accountId) throw new Error('Cloudflare provider is not properly configured.');
   const model = process.env[cfg.modelVar] || cfg.model;
   const gatewayId = process.env.CLOUDFLARE_GATEWAY_ID;
 
@@ -378,8 +378,8 @@ app.post('/api/chat', adaptiveChatLimiter, validateChatRequest, async (req, res)
   const apiKey = process.env[cfg.keyVar];
 
   if (isPlaceholder(apiKey)) {
-    return res.status(500).json({
-      error: `No AI API key configured. Set ${cfg.keyVar} (or another supported provider key) in your .env file.`,
+    return res.status(503).json({
+      error: 'No AI provider configured. Please configure a provider to continue.',
     });
   }
 
@@ -390,7 +390,8 @@ app.post('/api/chat', adaptiveChatLimiter, validateChatRequest, async (req, res)
     const data = await callAI(provider, messages, maxTokens);
     res.json(data);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[/api/chat] AI call failed:', err);
+    res.status(500).json({ error: 'AI service error. Please try again.' });
   }
 });
 
@@ -421,8 +422,8 @@ app.post('/api/synthesize', adaptiveChatLimiter, async (req, res) => {
   const apiKey = process.env[cfg.keyVar];
 
   if (isPlaceholder(apiKey)) {
-    return res.status(500).json({
-      error: `No AI API key configured. Set ${cfg.keyVar} in your .env file.`,
+    return res.status(503).json({
+      error: 'No AI provider configured. Please configure a provider to continue.',
     });
   }
 
@@ -457,7 +458,8 @@ MESSAGE: <1 punchy, profound sentence about how these concepts connect. Under 15
 
     res.json({ constellation, message });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[/api/synthesize] AI call failed:', err);
+    res.status(500).json({ error: 'AI service error. Please try again.' });
   }
 });
 
