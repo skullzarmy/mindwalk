@@ -52,7 +52,7 @@ const TRAIL_MAX_LENGTH = 20;
  * Word-cloud entries are always single alphabetic words (3–25 chars per textProcessing.js).
  */
 const isManualEntry = (entry) =>
-  entry.includes(' ') || entry.length > 25 || !/^[a-zA-Z]+$/.test(entry);
+  entry.includes(' ') || entry.length < 3 || entry.length > 25 || !/^[a-zA-Z]+$/.test(entry);
 
 /** Truncate a manual entry for compact display in the path trail breadcrumb */
 const truncateTrailEntry = (text) =>
@@ -336,11 +336,13 @@ export default function App() {
       setIsSynthesizing(false);
     }
 
-    // Track the typed prompt as a journey step (manual entries are part of the walk)
-    const newPath = [...wordPathRef.current, text];
+    // Track the typed prompt as a journey step (manual entries are part of the walk).
+    // Truncate to TRAIL_MAX_LENGTH to keep wordPath (and later prompt context) bounded.
+    const pathEntry = truncateTrailEntry(text);
+    const newPath = [...wordPathRef.current, pathEntry];
     wordPathRef.current = newPath;
     setWordPath(newPath);
-    setLastWord(text);
+    setLastWord(pathEntry);
 
     // Auto-synthesis trigger (consistent with word-click behaviour).
     // startSynthesis handles the AI response, so we skip sendMessage for this step.
