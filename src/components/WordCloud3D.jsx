@@ -260,11 +260,20 @@ export default function WordCloud3D({
     const pathAnimRef = useRef({ progress: 1, totalPoints: 0, pathMesh: null, style: "line" });
     // prevPathLenRef: number of valid control points on last path build (for animation start)
     const prevPathLenRef = useRef(0);
+    // wordPathRef: mirrors the wordPath prop so the words-rebuild effect can read
+    // the current path without including it in the dependency array (which would
+    // cause a full cloud rebuild every time a word is clicked).
+    const wordPathRef = useRef(wordPath);
 
     // Media queries for user preferences
     const isLightMode = typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: light)").matches;
     const reducedMotion =
         typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // Keep wordPathRef in sync with the wordPath prop
+    useEffect(() => {
+        wordPathRef.current = wordPath;
+    }, [wordPath]);
 
     // ── Development memory monitoring ────────────────────────────────────────
     useEffect(() => {
@@ -432,9 +441,15 @@ export default function WordCloud3D({
 
         const radius = 100;
         const posMap = new Map();
+        // Words that are part of the current path keep their previous positions so
+        // that path lines (which were drawn to those positions) remain accurate
+        // across cloud rebuilds triggered by new AI responses.
+        const prevPositions = wordPositionsRef.current;
+        const pathSet = new Set(wordPathRef.current);
         const newSprites = words.map((w, i) => {
             const sprite = createWordSprite(w.word, w.weight, isLightMode, colorblindMode);
-            const pos = fibonacciSphere(i, words.length, radius);
+            const prevPos = pathSet.has(w.word) ? prevPositions.get(w.word) : null;
+            const pos = prevPos ? prevPos.clone() : fibonacciSphere(i, words.length, radius);
             sprite.position.copy(pos);
             sprite.userData.basePos = pos.clone();
             posMap.set(w.word, pos.clone());
