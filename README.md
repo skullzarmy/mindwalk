@@ -121,18 +121,6 @@ PORT=8080 NODE_ENV=production node server.js
 
 ---
 
-### Option C · Netlify
-
-A `netlify.toml` and serverless function wrapper (`netlify/functions/api.js`)
-are included for one-click Netlify deployment.
-
-1. Connect your fork to a Netlify site.
-2. In **Site configuration → Environment variables**, add your AI provider key (e.g. `OPENAI_API_KEY`).
-3. Deploy — Netlify runs `npm run build` automatically and routes `/api/*` to
-   the serverless function.
-
----
-
 ### Environment variables reference
 
 | Variable | Default | Description |
