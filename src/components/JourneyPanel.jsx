@@ -252,7 +252,15 @@ export default function JourneyPanel({
                       {i < wordPath.length - 1 && <div className="node-line" />}
                     </div>
                     <div className={`node-label${i === wordPath.length - 1 ? ' node-label-current' : ''}${manual ? ' node-label-manual' : ''}`}>
-                      {manual && <span className="node-manual-icon" aria-label="Typed prompt">✍ </span>}
+                      {manual && (
+                        <span
+                          className="node-manual-icon"
+                          role="img"
+                          aria-label="Typed prompt"
+                        >
+                          ✍
+                        </span>
+                      )}
                       {word}
                     </div>
                   </div>
