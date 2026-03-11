@@ -547,6 +547,7 @@ export default function App() {
             setSynthesisResult(null);
             setIsSynthesizing(false);
           }}
+          onNewWalk={handleNewWalk}
         />
       )}
 

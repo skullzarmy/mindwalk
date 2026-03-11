@@ -1824,13 +1824,26 @@ html, body, #root {
 }
 
 .close-synthesis-btn {
+  background: transparent;
+  border: 1px solid var(--cyan);
+  color: var(--cyan);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.1);
+}
+
+.close-synthesis-btn:hover {
+  background: rgba(0, 255, 255, 0.1);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.new-walk-btn {
   background: var(--cyan);
   border: none;
   color: #050510;
   box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
 }
 
-.close-synthesis-btn:hover {
+.new-walk-btn:hover {
   background: #ffffff;
   box-shadow: 0 0 30px rgba(255, 255, 255, 0.6);
   transform: translateY(-2px);

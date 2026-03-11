@@ -130,7 +130,7 @@ function ShareModal({ onClose, result, wordPath }) {
 }
 
 // ── Main Synthesis Overlay ──────────────────────────────────────────────────
-export default function SynthesisOverlay({ result, wordPath, onContinue }) {
+export default function SynthesisOverlay({ result, wordPath, onContinue, onNewWalk }) {
   const overlayRef = useRef(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
@@ -168,6 +168,12 @@ export default function SynthesisOverlay({ result, wordPath, onContinue }) {
               onClick={onContinue}
             >
               RESUME →
+            </button>
+            <button 
+              className="new-walk-btn" 
+              onClick={onNewWalk}
+            >
+              NEW WALK ✦
             </button>
           </div>
         </div>
