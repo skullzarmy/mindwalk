@@ -266,15 +266,13 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
 
 // ── Rate limiters (Phase 1 + 2 + 3) ──────────────────────────────────────────
 
-// In Netlify's serverless context, serverless-http wraps invocations without a
-// real TCP socket, so Express cannot populate req.ip even with 'trust proxy'
-// set. Read through Netlify's own client-IP header, then the standard
-// X-Forwarded-For, and fall back to 'unknown' as a safe sentinel so that
-// express-rate-limit never receives undefined.
+// When running behind a reverse proxy, Express may not populate req.ip even
+// with 'trust proxy' set. Read through the standard X-Forwarded-For header
+// and fall back to 'unknown' as a safe sentinel so that express-rate-limit
+// never receives undefined.
 function resolveClientIp(req) {
   return (
     req.ip ??
-    req.headers['x-nf-client-connection-ip'] ??
     req.headers['x-forwarded-for']?.split(',')[0].trim() ??
     'unknown'
   );
@@ -495,6 +493,3 @@ if (!process.env.NETLIFY) {
     console.log(`\n🧠 MindWalk server → http://localhost:${PORT}\n`);
   });
 }
-
-// Export the Express app so serverless-http can wrap it into a Lambda execution context
-export { app };
