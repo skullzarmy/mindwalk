@@ -1,6 +1,13 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { getSavedWalks, deleteSavedWalk } from '../utils/walkStorage.js';
 
+/**
+ * Returns true when a journey step was typed manually (not clicked from the cloud).
+ * Word-cloud entries are always single alphabetic words (3–25 chars).
+ */
+const isManualEntry = (entry) =>
+  entry.includes(' ') || entry.length > 25 || !/^[a-zA-Z]+$/.test(entry);
+
 export default function JourneyPanel({
   wordPath,
   isOpen,
@@ -231,22 +238,26 @@ export default function JourneyPanel({
           wordPath.length === 0 ? (
             <p className="empty-state">
               No journey yet.<br />
-              Click a word in the cloud to begin exploring.
+              Click a word in the cloud or type a thought below to begin.
             </p>
           ) : (
             <div className="journey-nodes">
-              {wordPath.map((word, i) => (
-                <div key={i} className="journey-node">
-                  <div className="journey-node-marker">
-                    <span className="node-step">{String(i + 1).padStart(2, '0')}</span>
-                    <div className={`node-dot ${i === wordPath.length - 1 ? 'node-dot-current' : ''}`} />
-                    {i < wordPath.length - 1 && <div className="node-line" />}
+              {wordPath.map((word, i) => {
+                const manual = isManualEntry(word);
+                return (
+                  <div key={i} className={`journey-node${manual ? ' journey-node-manual' : ''}`}>
+                    <div className="journey-node-marker">
+                      <span className="node-step">{String(i + 1).padStart(2, '0')}</span>
+                      <div className={`node-dot${i === wordPath.length - 1 ? ' node-dot-current' : ''}${manual ? ' node-dot-manual' : ''}`} />
+                      {i < wordPath.length - 1 && <div className="node-line" />}
+                    </div>
+                    <div className={`node-label${i === wordPath.length - 1 ? ' node-label-current' : ''}${manual ? ' node-label-manual' : ''}`}>
+                      {manual && <span className="node-manual-icon" aria-label="Typed prompt" aria-hidden="true">✍ </span>}
+                      {word}
+                    </div>
                   </div>
-                  <div className={`node-label ${i === wordPath.length - 1 ? 'node-label-current' : ''}`}>
-                    {word}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               <div ref={bottomRef} />
             </div>
           )

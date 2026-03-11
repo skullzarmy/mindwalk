@@ -825,6 +825,37 @@ html, body, #root {
   font-weight: bold;
 }
 
+/* ── Manual (typed) journey entry styles ─────────────────────────────────── */
+.journey-node-manual .node-dot {
+  border-color: var(--purple);
+}
+
+.node-dot-manual.node-dot-current {
+  border-color: var(--purple);
+  background: var(--purple);
+  box-shadow: 0 0 8px rgba(192, 132, 252, 0.6);
+}
+
+.node-label-manual {
+  font-style: italic;
+  word-break: break-word;
+}
+
+.node-manual-icon {
+  opacity: 0.7;
+  font-style: normal;
+}
+
+.path-trail-node-manual {
+  font-style: italic;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: none;
+  display: inline-block;
+  vertical-align: middle;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
