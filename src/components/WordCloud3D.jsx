@@ -158,6 +158,10 @@ const _toCamera = new THREE.Vector3();
 const _hoverTarget = new THREE.Vector3();
 const _hoverScale = new THREE.Vector3();
 
+// Minimum distance (world units) between a new fibonacci position and any pinned
+// position before the fibonacci slot is considered occupied and skipped.
+const PINNED_POSITION_MIN_DISTANCE = 1.0;
+
 /**
  * Fibonacci-sphere distribution for uniform point coverage.
  */
@@ -446,10 +450,30 @@ export default function WordCloud3D({
         // across cloud rebuilds triggered by new AI responses.
         const prevPositions = wordPositionsRef.current;
         const pathSet = new Set(wordPathRef.current);
+
+        // Collect positions already reserved by pinned path words so they can be
+        // excluded from the fibonacci pool, preventing overlap/double-assignment.
+        const reservedPositions = words
+            .filter(w => pathSet.has(w.word) && prevPositions.has(w.word))
+            .map(w => prevPositions.get(w.word));
+
+        // Build a pool of available fibonacci positions for this word count,
+        // excluding any that coincide with a reserved (pinned) position.
+        const freePool = [];
+        for (let i = 0; i < words.length; i++) {
+            const fp = fibonacciSphere(i, words.length, radius);
+            if (!reservedPositions.some(rp => fp.distanceTo(rp) < PINNED_POSITION_MIN_DISTANCE)) {
+                freePool.push(fp);
+            }
+        }
+        let freeIdx = 0;
+
         const newSprites = words.map((w, i) => {
             const sprite = createWordSprite(w.word, w.weight, isLightMode, colorblindMode);
-            const prevPos = pathSet.has(w.word) ? prevPositions.get(w.word) : null;
-            const pos = prevPos ? prevPos.clone() : fibonacciSphere(i, words.length, radius);
+            const pinnedPos = pathSet.has(w.word) ? (prevPositions.get(w.word) ?? null) : null;
+            const pos = pinnedPos
+                ? pinnedPos.clone()
+                : (freePool[freeIdx] ? freePool[freeIdx++].clone() : fibonacciSphere(i, words.length, radius));
             sprite.position.copy(pos);
             sprite.userData.basePos = pos.clone();
             posMap.set(w.word, pos.clone());
