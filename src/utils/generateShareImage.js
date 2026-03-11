@@ -82,7 +82,7 @@ export async function generateShareImage(
 
     // Bottom section: path box + margin + message + margin + footer
     ctx.font = `400 ${pathFS}px "Share Tech Mono"`;
-    const pathStr   = wordPath.map(w => w.toUpperCase()).join('  \u2192  ');
+    const pathStr   = wordPath.map(_formatPathEntry).join('  \u2192  ');
     const pathLines = _wrapText(ctx, pathStr, contentWidth - PATH_PAD_H * 2);
     const pathLineH = Math.round(pathFS * 1.6);
     const pathContH = pathLines.length * pathLineH + PATH_PAD_V * 2;
@@ -227,6 +227,25 @@ export async function generateShareImage(
 }
 
 // ── Internal helpers ───────────────────────────────────────────────────────────
+
+/**
+ * Formats a single path entry for share-image display.
+ * Single alphabetic words (from the cloud) are uppercased as before.
+ * Manual typed prompts are condensed to a short quoted excerpt so they don't
+ * overflow the path box on the card.
+ */
+function _formatPathEntry(entry) {
+  const trimmed = entry.trim();
+  const tokens  = trimmed.split(/\s+/);
+  // Single alphabetic word — standard cloud entry
+  if (tokens.length === 1 && /^[a-zA-Z]+$/.test(trimmed) && trimmed.length <= 25) {
+    return trimmed.toUpperCase();
+  }
+  // Manual entry — show first 3 words as a quoted excerpt
+  const excerpt = tokens.slice(0, 3).join(' ');
+  const suffix  = tokens.length > 3 ? '\u2026' : '';
+  return `\u201C${excerpt}${suffix}\u201D`;
+}
 
 /**
  * Sets ctx.letterSpacing when supported.

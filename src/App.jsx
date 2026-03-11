@@ -44,6 +44,20 @@ const SEED_WORDS = [
   { word: 'discover',      weight: 0.15 },
 ];
 
+// Max length for a manual prompt entry displayed in the path trail breadcrumb
+const TRAIL_MAX_LENGTH = 20;
+
+/**
+ * Returns true when a journey step was typed manually (not clicked from the cloud).
+ * Word-cloud entries are always single alphabetic words (3–25 chars per textProcessing.js).
+ */
+const isManualEntry = (entry) =>
+  entry.includes(' ') || entry.length > 25 || !/^[a-zA-Z]+$/.test(entry);
+
+/** Truncate a manual entry for compact display in the path trail breadcrumb */
+const truncateTrailEntry = (text) =>
+  text.length > TRAIL_MAX_LENGTH ? text.slice(0, TRAIL_MAX_LENGTH).trimEnd() + '…' : text;
+
 export default function App() {
   const [messages,        setMessages]        = useState([]);
   const [words,           setWords]           = useState(SEED_WORDS);
@@ -313,10 +327,38 @@ export default function App() {
   // ── Form submit ───────────────────────────────────────────────────────────
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (inputValue.trim() && !isLoading) {
-      sendMessage(inputValue.trim());
-      setInputValue('');
+    const text = inputValue.trim();
+    if (!text || isLoading) return;
+
+    // Clear any active synthesis result so the user can keep exploring
+    if (synthesisResult) {
+      setSynthesisResult(null);
+      setIsSynthesizing(false);
     }
+
+    // Track the typed prompt as a journey step (manual entries are part of the walk)
+    const newPath = [...wordPathRef.current, text];
+    wordPathRef.current = newPath;
+    setWordPath(newPath);
+    setLastWord(text);
+
+    // Auto-synthesis trigger (consistent with word-click behaviour).
+    // startSynthesis handles the AI response, so we skip sendMessage for this step.
+    if (newPath.length >= SYNTHESIS_WINDOW && newPath.length % SYNTHESIS_WINDOW === 0) {
+      startSynthesis(newPath.slice(-SYNTHESIS_WINDOW));
+      setInputValue('');
+      return;
+    }
+
+    // Append journey context so the AI can weave connections across the walk
+    const pathStr = newPath.join(' → ');
+    let prompt = text;
+    if (newPath.length > 1) {
+      prompt += `\n\n[Mind walk journey: ${pathStr}]`;
+    }
+
+    sendMessage(prompt);
+    setInputValue('');
   };
 
   // ── Panel toggle (only one open at a time) ───────────────────────────────
@@ -517,14 +559,18 @@ export default function App() {
       {/* ── Path trail ── */}
       {wordPath.length > 0 && (
         <div className="path-trail" aria-label="Mind walk journey path">
-          {wordPath.map((word, i) => (
-            <span key={i} className="path-trail-item">
-              {i > 0 && <span className="path-trail-arrow" aria-hidden="true">→</span>}
-              <span className={`path-trail-node${i === wordPath.length - 1 ? ' path-trail-node-current' : ''}`}>
-                {word}
+          {wordPath.map((word, i) => {
+            const isManual = isManualEntry(word);
+            return (
+              <span key={i} className="path-trail-item">
+                {i > 0 && <span className="path-trail-arrow" aria-hidden="true">→</span>}
+                <span className={`path-trail-node${i === wordPath.length - 1 ? ' path-trail-node-current' : ''}${isManual ? ' path-trail-node-manual' : ''}`}
+                  title={isManual ? word : undefined}>
+                  {isManual ? truncateTrailEntry(word) : word}
+                </span>
               </span>
-            </span>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -533,7 +579,7 @@ export default function App() {
         <div className="loading-overlay" aria-live="polite">
           <div className="loading-ring" />
           <span>
-            {isSynthesizing ? 'Weaving your journey…' : lastWord ? `Pondering "${lastWord}"…` : 'Thinking…'}
+            {isSynthesizing ? 'Weaving your journey…' : lastWord ? `Pondering "${truncateTrailEntry(lastWord)}"…` : 'Thinking…'}
           </span>
         </div>
       )}
