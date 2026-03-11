@@ -6,7 +6,7 @@ import { getSavedWalks, deleteSavedWalk } from '../utils/walkStorage.js';
  * Word-cloud entries are always single alphabetic words (3–25 chars).
  */
 const isManualEntry = (entry) =>
-  entry.includes(' ') || entry.length > 25 || !/^[a-zA-Z]+$/.test(entry);
+  entry.includes(' ') || entry.length < 3 || entry.length > 25 || !/^[a-zA-Z]+$/.test(entry);
 
 export default function JourneyPanel({
   wordPath,
@@ -252,7 +252,7 @@ export default function JourneyPanel({
                       {i < wordPath.length - 1 && <div className="node-line" />}
                     </div>
                     <div className={`node-label${i === wordPath.length - 1 ? ' node-label-current' : ''}${manual ? ' node-label-manual' : ''}`}>
-                      {manual && <span className="node-manual-icon" aria-label="Typed prompt" aria-hidden="true">✍ </span>}
+                      {manual && <span className="node-manual-icon" aria-label="Typed prompt">✍ </span>}
                       {word}
                     </div>
                   </div>
