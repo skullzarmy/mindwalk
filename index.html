@@ -33,6 +33,23 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-title" content="MindWalk" />
     <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Cloudflare Web Analytics -->
+    <!-- SRI is intentionally omitted: beacon.min.js is updated frequently
+         by Cloudflare; a static hash would break analytics on each update. -->
+    <script>
+      (function () {
+        var token = '%VITE_CF_BEACON_TOKEN%';
+        if (token && token !== '%VITE_CF_BEACON_TOKEN%') {
+          var s = document.createElement('script');
+          s.defer = true;
+          s.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+          s.setAttribute('data-cf-beacon', JSON.stringify({ token: token }));
+          document.head.appendChild(s);
+        }
+      })();
+    </script>
+    <!-- End Cloudflare Web Analytics -->
   </head>
   <body>
     <div id="root"></div>

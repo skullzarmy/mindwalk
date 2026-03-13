@@ -637,6 +637,16 @@ export default function App() {
             Click any word to ponder it&nbsp;&nbsp;·&nbsp;&nbsp;Drag to orbit&nbsp;&nbsp;·&nbsp;&nbsp;Scroll to zoom
           </p>
         )}
+        <p className="footer-legal">
+          <a
+            href="https://joepeterson.work/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="privacy-link"
+          >
+            Privacy Policy
+          </a>
+        </p>
       </footer>
 
       {/* ── Side panels ── */}

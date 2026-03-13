@@ -376,6 +376,28 @@ html, body, #root {
   text-transform: uppercase;
 }
 
+.footer-legal {
+  font-size: 0.68rem;
+  color: var(--text-mute);
+  letter-spacing: 0.06em;
+}
+
+.privacy-link {
+  color: var(--text-mute);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.privacy-link:hover,
+.privacy-link:focus-visible {
+  color: var(--cyan);
+  text-decoration: underline;
+}
+.privacy-link:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 /* ── Side panels (shared) ───────────────────────────────────────────────── */
 .side-panel {
   position: fixed;
