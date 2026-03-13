@@ -3,12 +3,47 @@ import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
+import fs from 'fs';
 import { validateChatRequest } from './middleware/validateChatRequest.js';
 
 // Use process.cwd() instead of fileURLToPath(import.meta.url) so this module
 // works in both native ESM and esbuild CJS bundles (Netlify Functions).
 // import.meta.url is undefined in CJS context and would crash at module load.
 const SERVER_DIR = process.cwd();
+
+// ── OG / index.html canonical-URL injection ───────────────────────────────────
+// When the Vite build was produced without VITE_CANONICAL_URL, the built
+// index.html still contains the __CANONICAL_URL__ placeholder.  The Express
+// server resolves it at startup using the runtime value of VITE_CANONICAL_URL,
+// making OG image tags absolute even in runtime-only deployment scenarios
+// (e.g. Docker images built in CI without a .env, then deployed with one).
+//
+// Sentinel values:
+//   null  — not yet attempted
+//   false — dist/index.html is not present (dev mode) or unreadable
+//   string — cached, injected HTML ready to serve
+let _cachedIndexHtml = null;
+
+function getIndexHtml() {
+  if (_cachedIndexHtml !== null) {
+    return _cachedIndexHtml === false ? null : _cachedIndexHtml;
+  }
+  const filePath = path.join(SERVER_DIR, 'dist', 'index.html');
+  try {
+    let html = fs.readFileSync(filePath, 'utf-8');
+    const canonicalUrl = process.env.VITE_CANONICAL_URL || '';
+    html = html.replace(/__CANONICAL_URL__/g, canonicalUrl);
+    _cachedIndexHtml = html;
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      // Unexpected error — log so operators can diagnose permission or I/O issues
+      console.error('[MindWalk] Failed to read dist/index.html:', err.message);
+    }
+    // Mark as unavailable so we don't retry on every request
+    _cachedIndexHtml = false;
+  }
+  return _cachedIndexHtml === false ? null : _cachedIndexHtml;
+}
 const app = express();
 // Trust the first proxy hop (Vite or Netlify) so rate limiter reads X-Forwarded-For properly
 app.set('trust proxy', 1);
@@ -484,8 +519,17 @@ const staticLimiter = rateLimit({
 // Avoid launching an independent port listener when running as a Netlify serverless function
 if (!process.env.NETLIFY) {
   if (process.env.NODE_ENV === 'production') {
+    // Pre-warm the HTML cache at startup so OG canonical URLs are injected
+    // before the first request arrives.
+    getIndexHtml();
+
     app.get('*', staticLimiter, (_req, res) => {
-      res.sendFile(path.join(SERVER_DIR, 'dist', 'index.html'));
+      const html = getIndexHtml();
+      if (html) {
+        res.type('html').send(html);
+      } else {
+        res.sendFile(path.join(SERVER_DIR, 'dist', 'index.html'));
+      }
     });
   }
 
